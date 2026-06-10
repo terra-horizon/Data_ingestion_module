@@ -1,0 +1,10 @@
+node_modules
+.npm-cache
+npm-debug.log*
+.env
+.git
+.github
+docs/site
+tests_external/output
+__pycache__
+*.pyc
