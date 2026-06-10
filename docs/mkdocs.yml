@@ -1,0 +1,67 @@
+site_name: TERRA Data Ingestion Module Docs
+
+site_url: https://terra-horizon.github.io/Data_ingestion_module/
+repo_url: https://github.com/terra-horizon/Data_ingestion_module/
+
+docs_dir: docs
+site_dir: site
+
+nav:
+  - Overview: index.md
+  - System:
+    - Architecture: architecture.md
+    - API Reference: api-reference.md
+    - Workflow: workflow.md
+  - Setup & Validation:
+    - Deployment: deployment.md
+    - Configuration: configuration.md
+    - Quality Assurance: qa.md
+    - Pipeline Test Scenarios: pipeline-test-scenarios.md
+  - Material:
+    - FAQ: faq.md
+  - License: license.md
+  - Home: https://terra-horizon.github.io/
+
+theme:
+  name: 'material'
+  favicon: images/favicon.ico
+  logo: images/TERRA_Logo_Header.png
+  icon:
+    repo: fontawesome/brands/github
+  custom_dir: overrides
+  features:
+    - navigation.path
+    - navigation.top
+
+extra_css:
+  - stylesheets/custom-footer.css
+  - stylesheets/mkdocsoad.css
+
+plugins:
+  - search
+  - mike
+  - neoteroi.mkdocsoad:
+      use_pymdownx: true
+
+markdown_extensions:
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - toc:
+      permalink: true
+
+extra:
+  version:
+    provider: mike
+    alias: true
+    default: latest
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/terra-horizon
+    - icon: fontawesome/brands/x-twitter
+      link: https://x.com/horizon_terra
+    - icon: fontawesome/brands/youtube
+      link: https://www.youtube.com/@TERRAHORIZON
+    - icon: fontawesome/brands/linkedin
+      link: https://www.linkedin.com/company/terra-horizon
