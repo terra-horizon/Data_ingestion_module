@@ -1,0 +1,30 @@
+{
+  "name": "data-ingestion-module",
+  "version": "0.1.0",
+  "description": "Stateless HTTP data ingestion module that replaces direct external provider calls from T modules.",
+  "main": "src/server.js",
+  "scripts": {
+    "dev": "nodemon src/server.js",
+    "start": "node src/server.js"
+  },
+  "keywords": [
+    "data-ingestion",
+    "express",
+    "copernicus",
+    "catalogue"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^1.16.1",
+    "cors": "^2.8.6",
+    "dotenv": "^16.6.1",
+    "express": "^4.22.2",
+    "express-async-handler": "^1.2.0",
+    "helmet": "^8.2.0",
+    "morgan": "^1.10.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.14"
+  }
+}
