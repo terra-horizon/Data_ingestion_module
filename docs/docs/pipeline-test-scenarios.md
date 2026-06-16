@@ -157,3 +157,56 @@ Expected error code:
 ```text
 EXTERNAL_API_TIMEOUT
 ```
+
+## Scenario 8: Mocked Ingestion Candidate Tests
+
+Run the unit and API tests:
+
+```bash
+npm test
+```
+
+The mocked tests verify:
+
+- CDSE token payload construction and token extraction
+- missing credential errors
+- credential rotation
+- Sentinel-2 Statistics payloads and water-quality metric parsing
+- Sentinel-3 Statistics payloads and Kelvin-to-Celsius conversion
+- water tile screening payloads and scene parsing
+- Sentinel Hub Process payloads and base64 image responses
+- unsupported source/mode/profile handling
+
+These tests do not require live CDSE credentials.
+
+## Scenario 9: Forecaster Parity Checks
+
+The external parity scripts compare this ingestion module against the original forecaster implementation. They require:
+
+- a running ingestion service
+- live CDSE credentials in `.env`
+- a local clone of `terra-horizon/uc1.forecaster.uth.alpha`
+- Python dependencies needed by the forecaster repository
+
+By default, the scripts look for the forecaster checkout at:
+
+```text
+C:\tmp\uc1.forecaster.uth.alpha
+```
+
+Override it with:
+
+```bash
+set FORECASTER_REPO_PATH=C:\path\to\uc1.forecaster.uth.alpha
+```
+
+Run:
+
+```bash
+python tests_external/compare_water_quality_statistics.py
+python tests_external/compare_sentinel3_surface_temperature.py
+python tests_external/compare_water_tile_screening.py
+python tests_external/compare_target_date_images.py
+```
+
+These scripts are intentionally not part of `npm test` because they make live provider calls.

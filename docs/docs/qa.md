@@ -4,6 +4,14 @@ QA for this alpha version focuses on HTTP availability, request normalization, C
 
 ## What To Verify Before Handoff
 
+Run the mocked automated tests:
+
+```bash
+npm test
+```
+
+These tests use local mock providers and must not call live CDSE services.
+
 Run the API locally:
 
 ```bash
@@ -25,6 +33,12 @@ python tests_external/compare_scene_download.py
 ```
 
 The scene search comparison should show no missing items and the same ordering.
+
+Live ingestion tests, if added later, must stay behind:
+
+```env
+RUN_LIVE_INGESTION_TESTS=1
+```
 
 ## Troubleshooting
 
