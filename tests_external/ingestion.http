@@ -1,0 +1,109 @@
+# ==========================================
+# VARIABLES (Shared across all requests)
+# ==========================================
+@baseUrl = http://localhost:3000
+
+###
+# @name CheckHealth
+# 1. Check Ingestion Service Health Status
+GET {{baseUrl}}/api/health
+Accept: application/json
+
+
+###
+# @name RunIngestion-WaterQualityStatistics
+# 2. Trigger the Ingestion Service for Water Quality Statistics
+POST {{baseUrl}}/api/ingestion/run
+Content-Type: application/json
+
+{
+  "source": "copernicus",
+  "mode": "sentinel-hub-statistics",
+  "responseProfile": "water-quality-statistics",
+  "requestParams": {
+    "bbox": [22.1, 39.4, 22.8, 40.1],
+    "dateFrom": "2025-01-01",
+    "dateTo": "2025-01-31",
+    "maxCloudCoverage": 30,
+    "product": "Se2WaQ"
+  }
+}
+
+###
+# @name RunIngestion-WaterQualityRecords
+# 3. Trigger the Ingestion Service for Water Quality Records
+POST {{baseUrl}}/api/ingestion/run
+Content-Type: application/json
+
+{
+  "source": "copernicus",
+  "mode": "sentinel-hub-statistics",
+  "responseProfile": "water-quality-statistics",
+  "requestParams": {
+    "bbox": [22.1, 39.4, 22.8, 40.1],
+    "dateFrom": "2025-01-01",
+    "dateTo": "2025-01-31",
+    "maxCloudCoverage": 30,
+    "product": "Se2WaQ"
+  }
+}
+
+###
+# @name RunIngestion-SurfaceTemperature
+# 4. Trigger the Ingestion Service for Surface Temperature
+POST {{baseUrl}}/api/ingestion/run
+Content-Type: application/json
+
+{
+  "source": "copernicus",
+  "mode": "sentinel-hub-statistics",
+  "responseProfile": "sentinel-3-surface-temperature",
+  "requestParams": {
+    "bbox": [22.1, 39.4, 22.8, 40.1],
+    "dateFrom": "2025-01-01",
+    "dateTo": "2025-01-31"
+  }
+}
+
+###
+# @name RunIngestion-TileScreening
+# 5. Trigger the Ingestion Service for Tile Screening
+POST {{baseUrl}}/api/ingestion/run
+Content-Type: application/json
+
+{
+  "source": "copernicus",
+  "mode": "sentinel-hub-statistics",
+  "responseProfile": "water-tile-screening",
+  "requestParams": {
+    "tiles": [
+      {
+        "name": "tile_0",
+        "bbox": [22.1, 39.4, 22.2, 39.5]
+      }
+    ],
+    "dateFrom": "2025-01-01",
+    "dateTo": "2026-01-01",
+    "maxCloudCoverage": 30
+  }
+}
+
+###
+# @name RunIngestion-ImageProducts
+# 6. Trigger the Ingestion Service for Image Products
+POST {{baseUrl}}/api/ingestion/run
+Content-Type: application/json
+
+{
+  "source": "copernicus",
+  "mode": "sentinel-hub-process",
+  "responseProfile": "target-date-image",
+  "requestParams": {
+    "bbox": [22.1, 39.4, 22.2, 39.5],
+    "date": "2026-05-27",
+    "tileName": "tile_0",
+    "tileSize": 400,
+    "imageKeys": ["true_color", "chla", "surface_temperature"],
+    "format": "image/png"
+  }
+}
