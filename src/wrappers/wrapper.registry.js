@@ -3,12 +3,20 @@ const StandardCatalogueWrapper = require('./standard-catalogue.wrapper');
 const CopernicusCompatibilityWrapper = require('./copernicus-compatibility.wrapper');
 const SceneSearchCompatibilityWrapper = require('./scene-search-compatibility.wrapper');
 const SceneDownloadCompatibilityWrapper = require('./scene-download-compatibility.wrapper');
+const Sentinel2StatisticsWrapper = require('./sentinel2-statistics.wrapper');
+const Sentinel3StatisticsWrapper = require('./sentinel3-statistics.wrapper');
+const WaterTileScreeningWrapper = require('./water-tile-screening.wrapper');
+const ImageProductWrapper = require('./image-product.wrapper');
 
 const wrappers = [
   new StandardCatalogueWrapper(),
   new CopernicusCompatibilityWrapper(),
   new SceneSearchCompatibilityWrapper(),
-  new SceneDownloadCompatibilityWrapper()
+  new SceneDownloadCompatibilityWrapper(),
+  new Sentinel2StatisticsWrapper(),
+  new Sentinel3StatisticsWrapper(),
+  new WaterTileScreeningWrapper(),
+  new ImageProductWrapper()
 ];
 
 function getWrapper(context) {

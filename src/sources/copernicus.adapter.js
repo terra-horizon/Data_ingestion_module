@@ -3,8 +3,29 @@ const BaseSourceAdapter = require('./base-source.adapter');
 const env = require('../config/env');
 const AppError = require('../utils/app-error');
 const { httpClient, normalizeHttpError } = require('../utils/http-client');
+const CdseAuthService = require('../services/copernicus/cdse-auth.service');
+const SentinelHubStatisticsAdapter = require('../services/copernicus/sentinel-hub-statistics.adapter');
+const WaterTileScreeningService = require('../services/copernicus/water-tile-screening.service');
+const SentinelHubProcessAdapter = require('../services/copernicus/sentinel-hub-process.adapter');
 
 class CopernicusAdapter extends BaseSourceAdapter {
+  constructor(options = {}) {
+    super();
+    this.httpClient = options.httpClient || httpClient;
+    this.authService = options.authService || new CdseAuthService({ httpClient: this.httpClient });
+    this.statisticsAdapter = options.statisticsAdapter || new SentinelHubStatisticsAdapter({
+      httpClient: this.httpClient,
+      authService: this.authService
+    });
+    this.waterTileScreeningService = options.waterTileScreeningService || new WaterTileScreeningService({
+      statisticsAdapter: this.statisticsAdapter
+    });
+    this.processAdapter = options.processAdapter || new SentinelHubProcessAdapter({
+      httpClient: this.httpClient,
+      authService: this.authService
+    });
+  }
+
   getName() {
     return 'copernicus';
   }
@@ -21,16 +42,44 @@ class CopernicusAdapter extends BaseSourceAdapter {
   }
 
   validateRequest(normalizedRequest) {
-    if (!['stac', 'sentinel-hub-catalog', 'sentinel-hub-process'].includes(normalizedRequest.mode)) {
-      throw new AppError('Only Copernicus stac, sentinel-hub-catalog, and sentinel-hub-process modes are currently implemented', 400, 'UNSUPPORTED_MODE');
+    if (!['stac', 'sentinel-hub-catalog', 'sentinel-hub-process', 'sentinel-hub-statistics'].includes(normalizedRequest.mode)) {
+      throw new AppError('Only Copernicus stac, sentinel-hub-catalog, sentinel-hub-process, and sentinel-hub-statistics modes are currently implemented', 400, 'UNSUPPORTED_MODE');
     }
 
     if (normalizedRequest.options.download && normalizedRequest.mode !== 'sentinel-hub-process') {
       throw new AppError('Product downloads are not enabled in this stateless module', 400, 'DOWNLOAD_NOT_SUPPORTED');
     }
 
-    if (normalizedRequest.mode === 'sentinel-hub-process' && !normalizedRequest.query.scene) {
+    if (normalizedRequest.mode === 'sentinel-hub-process'
+      && normalizedRequest.responseProfile === 'scene-download-compatibility'
+      && !normalizedRequest.query.scene) {
       throw new AppError('sentinel-hub-process mode requires requestParams.scene', 400, 'VALIDATION_ERROR');
+    }
+
+    if (normalizedRequest.mode === 'sentinel-hub-statistics'
+      && !['water-quality-statistics', 'sentinel-3-surface-temperature', 'water-tile-screening'].includes(normalizedRequest.responseProfile)) {
+      throw new AppError('Unsupported Sentinel Hub statistics responseProfile', 400, 'UNSUPPORTED_PROFILE');
+    }
+
+    if (normalizedRequest.mode === 'sentinel-hub-process'
+      && !['scene-download-compatibility', 'target-date-image'].includes(normalizedRequest.responseProfile)) {
+      throw new AppError('Unsupported Sentinel Hub process responseProfile', 400, 'UNSUPPORTED_PROFILE');
+    }
+
+    if (normalizedRequest.mode === 'sentinel-hub-statistics'
+      && normalizedRequest.responseProfile !== 'water-tile-screening'
+      && (!normalizedRequest.query.bbox || !normalizedRequest.query.dateFrom || !normalizedRequest.query.dateTo)) {
+      throw new AppError('bbox, dateFrom, and dateTo are required for Sentinel Hub statistics requests', 400, 'VALIDATION_ERROR');
+    }
+
+    if (normalizedRequest.responseProfile === 'water-tile-screening'
+      && (!normalizedRequest.query.tiles.length || !normalizedRequest.query.dateFrom || !normalizedRequest.query.dateTo)) {
+      throw new AppError('tiles, dateFrom, and dateTo are required for water tile screening', 400, 'VALIDATION_ERROR');
+    }
+
+    if (normalizedRequest.responseProfile === 'target-date-image'
+      && (!normalizedRequest.query.bbox || !normalizedRequest.query.date || !normalizedRequest.query.imageKeys.length)) {
+      throw new AppError('bbox, date, and imageKeys are required for target-date image requests', 400, 'VALIDATION_ERROR');
     }
   }
 
@@ -48,6 +97,18 @@ class CopernicusAdapter extends BaseSourceAdapter {
 
   async fetchData(normalizedRequest) {
     this.validateRequest(normalizedRequest);
+
+    if (normalizedRequest.mode === 'sentinel-hub-statistics') {
+      return normalizedRequest.responseProfile === 'water-tile-screening'
+        ? this.waterTileScreeningService.screenTiles(normalizedRequest)
+        : this.statisticsAdapter.fetchStatistics(normalizedRequest);
+    }
+
+    if (normalizedRequest.mode === 'sentinel-hub-process'
+      && normalizedRequest.responseProfile === 'target-date-image') {
+      return this.processAdapter.fetchImages(normalizedRequest);
+    }
+
     const externalRequest = this.buildExternalRequest(normalizedRequest);
 
     try {

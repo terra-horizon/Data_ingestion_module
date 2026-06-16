@@ -13,10 +13,18 @@ function errorMiddleware(error, req, res, next) {
     error: error.message
   });
 
+  const message = statusCode >= 500 && env.nodeEnv === 'production' ? 'Internal server error' : error.message;
+
   res.status(statusCode).json({
     success: false,
-    message: statusCode >= 500 && env.nodeEnv === 'production' ? 'Internal server error' : error.message,
-    code
+    message,
+    code,
+    error: {
+      code,
+      message,
+      ...(error.provider ? { provider: error.provider } : {}),
+      retryable: error.retryable === undefined ? statusCode >= 500 : error.retryable
+    }
   });
 }
 

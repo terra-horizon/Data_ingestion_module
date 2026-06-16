@@ -5,7 +5,11 @@ const SUPPORTED_RESPONSE_PROFILES = new Set([
   'standard',
   'copernicus-compatibility',
   'scene-search-compatibility',
-  'scene-download-compatibility'
+  'scene-download-compatibility',
+  'water-quality-statistics',
+  'sentinel-3-surface-temperature',
+  'water-tile-screening',
+  'target-date-image'
 ]);
 
 function normalizeRequest(payload) {
@@ -17,19 +21,25 @@ function normalizeRequest(payload) {
     throw new AppError('source is required', 400, 'VALIDATION_ERROR');
   }
 
+  if (!payload.mode) {
+    throw new AppError('mode is required', 400, 'VALIDATION_ERROR');
+  }
+
   if (!payload.requestParams || typeof payload.requestParams !== 'object' || Array.isArray(payload.requestParams)) {
     throw new AppError('requestParams is required and must be an object', 400, 'VALIDATION_ERROR');
   }
 
   const responseProfile = payload.responseProfile || 'standard';
   if (!SUPPORTED_RESPONSE_PROFILES.has(responseProfile)) {
-    throw new AppError('responseProfile must be one of: standard, copernicus-compatibility, scene-search-compatibility, scene-download-compatibility', 400, 'VALIDATION_ERROR');
+    throw new AppError(`responseProfile must be one of: ${Array.from(SUPPORTED_RESPONSE_PROFILES).join(', ')}`, 400, 'VALIDATION_ERROR');
   }
 
   const { requestParams } = payload;
   validateBbox(requestParams.bbox);
+  validateTiles(requestParams.tiles);
   validateDate(requestParams.dateFrom, 'dateFrom');
   validateDate(requestParams.dateTo, 'dateTo');
+  validateDate(requestParams.date, 'date');
 
   return {
     source: String(payload.source).trim().toLowerCase(),
@@ -43,14 +53,43 @@ function normalizeRequest(payload) {
       dateFrom: requestParams.dateFrom || '',
       dateTo: requestParams.dateTo || '',
       cloudCoverageMax: requestParams.cloudCoverageMax ?? requestParams.maxCloudPct ?? null,
+      maxCloudCoverage: requestParams.maxCloudCoverage ?? requestParams.cloudCoverageMax ?? requestParams.maxCloudPct ?? null,
       limit: normalizeLimit(requestParams.limit),
       maxImages: normalizeMaxImages(requestParams.maxImages || requestParams.max_images || requestParams.limit),
-      scene: requestParams.scene || null
+      scene: requestParams.scene || null,
+      product: requestParams.product || '',
+      tiles: normalizeTiles(requestParams.tiles),
+      date: requestParams.date || '',
+      tileName: requestParams.tileName || requestParams.tile_name || 'tile',
+      tileSize: normalizeTileSize(requestParams.tileSize || requestParams.tile_size || 400),
+      imageKeys: normalizeImageKeys(requestParams.imageKeys || requestParams.image_keys || ['true_color']),
+      outputFormat: requestParams.format || requestParams.outputFormat || payload.format || 'image/png',
+      crs: requestParams.crs,
+      upsampling: requestParams.upsampling,
+      downsampling: requestParams.downsampling
     },
     options: {
       download: payload.download === true
     }
   };
+}
+
+function validateTiles(tiles) {
+  if (tiles === undefined) {
+    return;
+  }
+
+  if (!Array.isArray(tiles) || tiles.length === 0) {
+    throw new AppError('tiles must be a non-empty array', 400, 'VALIDATION_ERROR');
+  }
+
+  for (const tile of tiles) {
+    if (!tile || typeof tile !== 'object') {
+      throw new AppError('each tile must be an object', 400, 'VALIDATION_ERROR');
+    }
+
+    validateBbox(tile.bbox);
+  }
 }
 
 function validateBbox(bbox) {
@@ -99,6 +138,39 @@ function normalizeMaxImages(value) {
   }
 
   return maxImages;
+}
+
+function normalizeTileSize(value) {
+  const tileSize = Number(value || 400);
+
+  if (!Number.isInteger(tileSize) || tileSize < 1) {
+    throw new AppError('tileSize must be a positive integer', 400, 'VALIDATION_ERROR');
+  }
+
+  return tileSize;
+}
+
+function normalizeImageKeys(value) {
+  if (Array.isArray(value)) {
+    return value.map((key) => String(key).trim()).filter(Boolean);
+  }
+
+  if (typeof value === 'string') {
+    return value.split(',').map((key) => key.trim()).filter(Boolean);
+  }
+
+  return ['true_color'];
+}
+
+function normalizeTiles(value) {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value.map((tile, index) => ({
+    name: tile.name ? String(tile.name) : `tile_${index}`,
+    bbox: tile.bbox
+  }));
 }
 
 module.exports = {
