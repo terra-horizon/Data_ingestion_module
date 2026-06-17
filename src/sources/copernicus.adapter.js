@@ -7,6 +7,7 @@ const CdseAuthService = require('../services/copernicus/cdse-auth.service');
 const SentinelHubStatisticsAdapter = require('../services/copernicus/sentinel-hub-statistics.adapter');
 const WaterTileScreeningService = require('../services/copernicus/water-tile-screening.service');
 const SentinelHubProcessAdapter = require('../services/copernicus/sentinel-hub-process.adapter');
+const { validateCopernicusRequest } = require('../services/copernicus/copernicus-request-rules');
 
 class CopernicusAdapter extends BaseSourceAdapter {
   constructor(options = {}) {
@@ -42,45 +43,7 @@ class CopernicusAdapter extends BaseSourceAdapter {
   }
 
   validateRequest(normalizedRequest) {
-    if (!['stac', 'sentinel-hub-catalog', 'sentinel-hub-process', 'sentinel-hub-statistics'].includes(normalizedRequest.mode)) {
-      throw new AppError('Only Copernicus stac, sentinel-hub-catalog, sentinel-hub-process, and sentinel-hub-statistics modes are currently implemented', 400, 'UNSUPPORTED_MODE');
-    }
-
-    if (normalizedRequest.options.download && normalizedRequest.mode !== 'sentinel-hub-process') {
-      throw new AppError('Product downloads are not enabled in this stateless module', 400, 'DOWNLOAD_NOT_SUPPORTED');
-    }
-
-    if (normalizedRequest.mode === 'sentinel-hub-process'
-      && normalizedRequest.responseProfile === 'scene-download-compatibility'
-      && !normalizedRequest.query.scene) {
-      throw new AppError('sentinel-hub-process mode requires requestParams.scene', 400, 'VALIDATION_ERROR');
-    }
-
-    if (normalizedRequest.mode === 'sentinel-hub-statistics'
-      && !['water-quality-statistics', 'sentinel-3-surface-temperature', 'water-tile-screening'].includes(normalizedRequest.responseProfile)) {
-      throw new AppError('Unsupported Sentinel Hub statistics responseProfile', 400, 'UNSUPPORTED_PROFILE');
-    }
-
-    if (normalizedRequest.mode === 'sentinel-hub-process'
-      && !['scene-download-compatibility', 'target-date-image'].includes(normalizedRequest.responseProfile)) {
-      throw new AppError('Unsupported Sentinel Hub process responseProfile', 400, 'UNSUPPORTED_PROFILE');
-    }
-
-    if (normalizedRequest.mode === 'sentinel-hub-statistics'
-      && normalizedRequest.responseProfile !== 'water-tile-screening'
-      && (!normalizedRequest.query.bbox || !normalizedRequest.query.dateFrom || !normalizedRequest.query.dateTo)) {
-      throw new AppError('bbox, dateFrom, and dateTo are required for Sentinel Hub statistics requests', 400, 'VALIDATION_ERROR');
-    }
-
-    if (normalizedRequest.responseProfile === 'water-tile-screening'
-      && (!normalizedRequest.query.tiles.length || !normalizedRequest.query.dateFrom || !normalizedRequest.query.dateTo)) {
-      throw new AppError('tiles, dateFrom, and dateTo are required for water tile screening', 400, 'VALIDATION_ERROR');
-    }
-
-    if (normalizedRequest.responseProfile === 'target-date-image'
-      && (!normalizedRequest.query.bbox || !normalizedRequest.query.date || !normalizedRequest.query.imageKeys.length)) {
-      throw new AppError('bbox, date, and imageKeys are required for target-date image requests', 400, 'VALIDATION_ERROR');
-    }
+    validateCopernicusRequest(normalizedRequest);
   }
 
   buildExternalRequest(normalizedRequest) {
@@ -98,42 +61,10 @@ class CopernicusAdapter extends BaseSourceAdapter {
   async fetchData(normalizedRequest) {
     this.validateRequest(normalizedRequest);
 
-    if (normalizedRequest.mode === 'sentinel-hub-statistics') {
-      return normalizedRequest.responseProfile === 'water-tile-screening'
-        ? this.waterTileScreeningService.screenTiles(normalizedRequest)
-        : this.statisticsAdapter.fetchStatistics(normalizedRequest);
-    }
-
-    if (normalizedRequest.mode === 'sentinel-hub-process'
-      && normalizedRequest.responseProfile === 'target-date-image') {
-      return this.processAdapter.fetchImages(normalizedRequest);
-    }
-
-    const externalRequest = this.buildExternalRequest(normalizedRequest);
+    const handler = this.getRequestHandler(normalizedRequest);
 
     try {
-      const response = normalizedRequest.mode === 'sentinel-hub-catalog'
-        ? await this.postSentinelHubCatalog(externalRequest)
-        : normalizedRequest.mode === 'sentinel-hub-process'
-          ? await this.postSentinelHubProcess(externalRequest)
-        : await httpClient.post(externalRequest.url, externalRequest.body, {
-          headers: await this.buildHeaders()
-        });
-      const rawData = response.data;
-
-      return {
-        rawData,
-        externalRequest,
-        metadata: {
-          source: this.getName(),
-          mode: normalizedRequest.mode,
-          collection: normalizedRequest.collection,
-          returnedItems: Array.isArray(rawData.features) ? rawData.features.length : 1,
-          contentType: response.headers ? response.headers['content-type'] : undefined,
-          sizeBytes: Buffer.isBuffer(rawData) ? rawData.length : undefined,
-          queriedAt: new Date().toISOString()
-        }
-      };
+      return await handler(normalizedRequest);
     } catch (error) {
       if (error instanceof AppError) {
         throw error;
@@ -141,6 +72,63 @@ class CopernicusAdapter extends BaseSourceAdapter {
 
       throw normalizeHttpError(error, `Copernicus ${normalizedRequest.mode} search failed`);
     }
+  }
+
+  getRequestHandler(normalizedRequest) {
+    const key = `${normalizedRequest.mode}:${normalizedRequest.responseProfile}`;
+    const handlers = {
+      'sentinel-hub-statistics:water-tile-screening': (request) =>
+        this.waterTileScreeningService.screenTiles(request),
+
+      'sentinel-hub-statistics:water-quality-statistics': (request) =>
+        this.statisticsAdapter.fetchStatistics(request),
+
+      'sentinel-hub-statistics:sentinel-3-surface-temperature': (request) =>
+        this.statisticsAdapter.fetchStatistics(request),
+
+      'sentinel-hub-process:target-date-image': (request) =>
+        this.processAdapter.fetchImages(request)
+    };
+
+    return handlers[key] || ((request) => this.fetchExternalRequest(request));
+  }
+
+  async fetchExternalRequest(normalizedRequest) {
+    const externalRequest = this.buildExternalRequest(normalizedRequest);
+    const response = await this.sendExternalRequest(normalizedRequest, externalRequest);
+    const rawData = response.data;
+
+    return {
+      rawData,
+      externalRequest,
+      metadata: this.buildResponseMetadata(normalizedRequest, rawData, response)
+    };
+  }
+
+  async sendExternalRequest(normalizedRequest, externalRequest) {
+    if (normalizedRequest.mode === 'sentinel-hub-catalog') {
+      return this.postSentinelHubCatalog(externalRequest);
+    }
+
+    if (normalizedRequest.mode === 'sentinel-hub-process') {
+      return this.postSentinelHubProcess(externalRequest);
+    }
+
+    return httpClient.post(externalRequest.url, externalRequest.body, {
+      headers: await this.buildHeaders()
+    });
+  }
+
+  buildResponseMetadata(normalizedRequest, rawData, response) {
+    return {
+      source: this.getName(),
+      mode: normalizedRequest.mode,
+      collection: normalizedRequest.collection,
+      returnedItems: Array.isArray(rawData.features) ? rawData.features.length : 1,
+      contentType: response.headers ? response.headers['content-type'] : undefined,
+      sizeBytes: Buffer.isBuffer(rawData) ? rawData.length : undefined,
+      queriedAt: new Date().toISOString()
+    };
   }
 
   extractMetadata(rawResponse) {
