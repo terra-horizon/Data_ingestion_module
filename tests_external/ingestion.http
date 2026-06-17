@@ -31,7 +31,7 @@ Content-Type: application/json
 
 ###
 # @name RunIngestion-WaterQualityRecords
-# 3. Trigger the Ingestion Service for Water Quality Records
+# 3. Trigger the Ingestion Service for Water Quality Statistics with different product
 POST {{baseUrl}}/api/ingestion/run
 Content-Type: application/json
 
@@ -44,7 +44,7 @@ Content-Type: application/json
     "dateFrom": "2025-01-01",
     "dateTo": "2025-01-31",
     "maxCloudCoverage": 30,
-    "product": "Se2WaQ"
+    "product": "Se2WaQ2"
   }
 }
 
