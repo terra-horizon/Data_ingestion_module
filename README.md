@@ -76,6 +76,20 @@ For `sentinel-hub-catalog`, configure either `COPERNICUS_ACCESS_TOKEN` or `COPER
 npm run dev
 ```
 
+## Testing
+
+Run the automated mock-based test suite:
+
+```bash
+npm test
+```
+
+The tests use mocked provider responses where appropriate and do not require live CDSE/Sentinel Hub access for every run.
+
+For full testing documentation, see [`docs/docs/testing.md`](docs/docs/testing.md).
+
+Live validation scripts under `tests_external/` require local credentials, a running ingestion service, and provider availability. Do not commit `.env`, access tokens, raw provider responses, image payloads, or files under `tests_external/output/`.
+
 ## Docker
 
 Build the image from the repository root:

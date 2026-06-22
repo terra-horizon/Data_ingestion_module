@@ -16,6 +16,7 @@ nav:
     - Deployment: deployment.md
     - Configuration: configuration.md
     - Forecaster Integration: forecaster-integration.md
+    - Testing: testing.md
     - Quality Assurance: qa.md
     - Pipeline Test Scenarios: pipeline-test-scenarios.md
   - Material:
