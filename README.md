@@ -144,7 +144,7 @@ Use this profile when replacing the direct Python `_search_scenes_cdse(...)` cal
 curl -X POST http://localhost:3000/api/ingestion/run \
   -H "Content-Type: application/json" \
   -d '{
-    "source": "copernicus",
+    "provider": "copernicus",
     "mode": "sentinel-hub-catalog",
     "collection": "sentinel-2-l2a",
     "datasetType": "catalogue",
@@ -273,3 +273,77 @@ Add a source adapter under `src/sources`, then register it in `source.registry.j
 Add a wrapper under `src/wrappers`, then register it in `wrapper.registry.js`.
 
 Wrappers select output shape using `datasetType`, `format`, `source`, and `responseProfile`.
+## Persisted Ingestion Results
+
+When MongoDB and MinIO are available from the TERRA node stack, the existing endpoint can persist results directly:
+
+- `POST /api/ingestion/run`
+
+Successful `/run` responses are persisted by default. Callers cannot bypass persistence with a request flag.
+
+The persisted flow reuses the existing provider workflow, uploads the wrapped result to S3/MinIO, stores metadata and object references in MongoDB, and returns the normal ingestion response with an additional `persistence` object. For image/download responses, `dataBase64` is removed from the returned payload and replaced with a `storage` reference to the MinIO object.
+
+Docker network configuration for `terra-node-stack-master`:
+
+```env
+MONGO_URI=mongodb://terra_service_user:<password>@terra-mongodb:27017/terra_db?authSource=terra_db
+MONGO_DB_NAME=terra_db
+MONGO_METADATA_COLLECTION=ingestion_metadata
+S3_ENDPOINT=http://terra-minio:9000
+S3_REGION=us-east-1
+S3_ACCESS_KEY=terra_service_user
+S3_SECRET_KEY=<password>
+S3_BUCKET=terra-bucket
+S3_FORCE_PATH_STYLE=true
+```
+
+If running the ingestion service directly on the host with `npm run dev`, use `localhost` instead of `terra-mongodb` and `terra-minio`.
+
+Example persisted request:
+
+```bash
+curl -X POST http://localhost:3000/api/ingestion/run \
+  -H "Content-Type: application/json" \
+  -d '{
+    "useCaseId": "1",
+    "provider": "copernicus",
+    "collection": "sentinel-2-l2a",
+    "mode": "stac",
+    "responseProfile": "standard",
+    "persist": true,
+    "requestParams": {
+      "bbox": [22.8, 39.4, 23.1, 39.7],
+      "dateFrom": "2024-01-01",
+      "dateTo": "2024-01-31",
+      "limit": 1
+    }
+  }'
+```
+
+
+
+
+## MinIO Object Verification
+
+Do not inspect files under the MinIO data volume to validate uploaded images. MinIO stores objects internally, and an object key such as `image.png` may appear on disk as a directory containing `xl.meta`. The S3 API is the authoritative interface.
+
+Use MinIO Client from the host or from a temporary container on `terra-network`:
+
+```bash
+mc alias set terra http://localhost:9000 <access-key> <secret-key>
+mc find terra/terra-bucket
+mc stat terra/terra-bucket/ingestions/<yyyy>/<mm>/<dd>/<ingestion-id>/assets/<asset>.png
+mc cp terra/terra-bucket/ingestions/<yyyy>/<mm>/<dd>/<ingestion-id>/assets/<asset>.png ./downloaded-asset.png
+```
+
+PowerShell checksum validation:
+
+```powershell
+Get-FileHash .\downloaded-asset.png -Algorithm SHA256
+```
+
+Docker-network validation without installing `mc` locally:
+
+```bash
+docker run --rm --network terra-network --entrypoint=/bin/sh minio/mc:RELEASE.2025-08-13T08-35-41Z -c "mc alias set terra http://terra-minio:9000 <access-key> <secret-key> && mc stat terra/terra-bucket/ingestions/<yyyy>/<mm>/<dd>/<ingestion-id>/assets/<asset>.png"
+```

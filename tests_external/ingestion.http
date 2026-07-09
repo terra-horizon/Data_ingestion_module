@@ -107,3 +107,162 @@ Content-Type: application/json
     "format": "image/png"
   }
 }
+###
+# @name RunIngestion-MandatoryPersistence
+# 7. Run ingestion with mandatory MongoDB + MinIO persistence
+POST {{baseUrl}}/api/ingestion/run
+Content-Type: application/json
+
+{
+  "useCaseId": "1",
+  "collection": "sentinel-2-l2a",
+  "provider": "copernicus",
+  "mode": "sentinel-hub-process",
+  "responseProfile": "target-date-image",
+  "bbox": [22.8, 39.4, 23.1, 39.7],
+  "dateFrom": "2024-01-01",
+  "dateTo": "2024-01-02",
+  "limit": 1
+}
+
+###
+# @name RunIngestion-SceneSearch
+# 8. Search scenes and persist the scene-search response to MongoDB + MinIO
+POST {{baseUrl}}/api/ingestion/run
+Content-Type: application/json
+
+{
+  "useCaseId": "1",
+  "collection": "sentinel-2-l2a",
+  "provider": "copernicus",
+  "mode": "sentinel-hub-catalog",
+  "datasetType": "catalogue",
+  "format": "json",
+  "responseProfile": "scene-search-compatibility",
+  "bbox": [22.8, 39.4, 23.1, 39.7],
+  "dateFrom": "2024-01-01",
+  "dateTo": "2024-01-31",
+  "maxImages": 5,
+  "maxCloudPct": 30
+}
+
+###
+# @name RunIngestion-SceneDownload
+# 9. Download one selected scene as GeoTIFF and persist the image object to MongoDB + MinIO
+# Replace scene_id and datetime with values returned by RunIngestion-SceneSearch.
+POST {{baseUrl}}/api/ingestion/run
+Content-Type: application/json
+
+{
+  "useCaseId": "1",
+  "collection": "sentinel-2-l2a",
+  "provider": "copernicus",
+  "mode": "sentinel-hub-process",
+  "datasetType": "image",
+  "format": "tiff",
+  "responseProfile": "scene-download-compatibility",
+  "download": true,
+  "bbox": [22.8, 39.4, 23.1, 39.7],
+  "scene": {
+    "scene_id": "S2A_MSIL2A_SAMPLE_SCENE_ID",
+    "datetime": "2024-01-02T09:30:00Z"
+  }
+}
+
+###
+# @name RunIngestion-TrueColorPreview-Athens
+# 9a. Visual sanity check: true-color PNG over Athens. This should preview normally in a browser/viewer.
+# This validates the bbox/date visually; the scene-download TIFF below intentionally remains raw external-team band data.
+POST {{baseUrl}}/api/ingestion/run
+Content-Type: application/json
+
+{
+  "useCaseId": "1",
+  "collection": "sentinel-2-l2a",
+  "provider": "copernicus",
+  "mode": "sentinel-hub-process",
+  "responseProfile": "target-date-image",
+  "bbox": [23.70, 37.94, 23.82, 38.04],
+  "date": "PASTE_YYYY_MM_DD_FROM_9B_DATETIME",
+  "tileName": "athens-preview",
+  "tileSize": 800,
+  "imageKeys": ["true_color"],
+  "format": "image/png"
+}
+
+###
+# @name RunIngestion-SceneSearch-Athens
+# 9b. Search a small Athens bbox for clear Sentinel-2 scenes, then paste the returned scene_id/datetime into 9c.
+POST {{baseUrl}}/api/ingestion/run
+Content-Type: application/json
+
+{
+  "useCaseId": "1",
+  "collection": "sentinel-2-l2a",
+  "provider": "copernicus",
+  "mode": "sentinel-hub-catalog",
+  "datasetType": "catalogue",
+  "format": "json",
+  "responseProfile": "scene-search-compatibility",
+  "bbox": [23.70, 37.94, 23.82, 38.04],
+  "dateFrom": "2024-06-01",
+  "dateTo": "2024-07-31",
+  "maxImages": 5,
+  "maxCloudPct": 10
+}
+
+###
+# @name RunIngestion-SceneDownload-Athens
+# 9c. Raw GeoTIFF download for the Athens bbox. Replace scene_id/datetime with values from 9b.
+# This intentionally replicates the external-team raw 5-band FLOAT32 TIFF and may look black in simple previewers.
+POST {{baseUrl}}/api/ingestion/run
+Content-Type: application/json
+
+{
+  "useCaseId": "1",
+  "collection": "sentinel-2-l2a",
+  "provider": "copernicus",
+  "mode": "sentinel-hub-process",
+  "datasetType": "image",
+  "format": "tiff",
+  "responseProfile": "scene-download-compatibility",
+  "download": true,
+  "bbox": [23.70, 37.94, 23.82, 38.04],
+  "scene": {
+    "scene_id": "S2A_MSIL2A_20240728T090601_N0511_R050_T34SGH_20240728T152859.SAFE",
+    "datetime": "2024-07-28T09:19:54.009Z"
+  }
+}
+###
+# Paste the real asset key returned by RunIngestion-SceneDownload here.
+# Look for data[*].storage.key or persistence.storage.objects[*].key in the /run response.
+# Do not use example-ingestion-id; that object does not exist in MinIO.
+@assetKey = ingestions/2026/07/08/6b768a0e-cf26-403d-ae99-b94e57d7c68d/assets/scene-download-compatibility-ast_db97d3200a0b.tif
+###
+# @name RetrievePersistedAssetPreview
+# 10. Try to preview a persisted PNG/JPEG/TIFF asset through the ingestion API.
+# PNG/JPEG normally display in the REST client/browser. TIFF support depends on your viewer.
+# If you copy data[*].storage.previewUrl, run that URL directly instead of putting it in @assetKey.
+GET {{baseUrl}}/api/ingestion/assets?key={{assetKey}}
+Accept: image/png,image/tiff,*/*
+
+###
+# @name DownloadPersistedAssetFile
+# 11. Force the persisted asset to download as a normal .png/.tif file.
+# If you copy data[*].storage.downloadUrl, run that URL directly instead of putting it in @assetKey.
+GET {{baseUrl}}/api/ingestion/assets?key={{assetKey}}&download=true
+Accept: image/png,image/tiff,application/geotiff,*/*
+
+###
+# Save a persisted asset directly to Desktop from PowerShell:
+# curl.exe --fail -L "http://localhost:3000/api/ingestion/assets?key=<URL_ENCODED_REAL_STORAGE_KEY>&download=true" -o "$env:USERPROFILE\Desktop\ingestion-preview.tif"
+
+
+
+
+
+
+
+
+
+

@@ -11,6 +11,8 @@ services:
       PORT: ${PORT:-3000}
     ports:
       - "${PORT:-3000}:${PORT:-3000}"
+    networks:
+      - terra-network
     restart: unless-stopped
     healthcheck:
       test:
@@ -24,3 +26,7 @@ services:
       timeout: 5s
       start_period: 10s
       retries: 3
+
+networks:
+  terra-network:
+    external: true
