@@ -11,6 +11,19 @@ const env = {
   cdseRateLimitRetryDelaySeconds: Number(process.env.CDSE_RATE_LIMIT_RETRY_DELAY_SECONDS || 180),
   cdseMaxRetries: Number(process.env.CDSE_MAX_RETRIES || 3),
   maxCatalogueLimit: Number(process.env.MAX_CATALOGUE_LIMIT || 100),
+  mongo: {
+    uri: process.env.MONGO_URI || '',
+    database: process.env.MONGO_DB_NAME || process.env.MONGO_DATABASE || '',
+    metadataCollection: process.env.MONGO_METADATA_COLLECTION || ''
+  },
+  s3: {
+    endpoint: process.env.S3_ENDPOINT || '',
+    region: process.env.S3_REGION || '',
+    accessKey: process.env.S3_ACCESS_KEY || '',
+    secretKey: process.env.S3_SECRET_KEY || '',
+    bucket: process.env.S3_BUCKET || '',
+    forcePathStyle: String(process.env.S3_FORCE_PATH_STYLE || 'true').toLowerCase() === 'true'
+  },
   copernicus: {
     apiMode: process.env.COPERNICUS_API_MODE || 'stac',
     stacBaseUrl: process.env.COPERNICUS_STAC_BASE_URL || 'https://stac.dataspace.copernicus.eu/v1',
@@ -59,3 +72,5 @@ for (let index = 2; index < 10; index += 1) {
 }
 
 module.exports = env;
+
+

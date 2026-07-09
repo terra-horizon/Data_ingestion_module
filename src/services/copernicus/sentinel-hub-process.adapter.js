@@ -26,6 +26,7 @@ class SentinelHubProcessAdapter {
         imageKey,
         status: buffer.length > 0 ? 'available' : 'unavailable',
         contentType: response.headers ? response.headers['content-type'] || normalizedRequest.query.outputFormat : normalizedRequest.query.outputFormat,
+        contentDisposition: response.headers ? response.headers['content-disposition'] : undefined,
         dataBase64: buffer.length > 0 ? buffer.toString('base64') : '',
         sizeBytes: buffer.length,
         requestedDate: normalizedRequest.query.date,
@@ -160,3 +161,4 @@ class SentinelHubProcessAdapter {
 }
 
 module.exports = SentinelHubProcessAdapter;
+

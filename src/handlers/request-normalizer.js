@@ -17,24 +17,22 @@ function normalizeRequest(payload) {
     throw new AppError('Request body must be a JSON object', 400, 'INVALID_REQUEST');
   }
 
-  if (!payload.source) {
-    throw new AppError('source is required', 400, 'VALIDATION_ERROR');
+  const source = payload.source || payload.provider;
+  if (!source) {
+    throw new AppError('source or provider is required', 400, 'VALIDATION_ERROR');
   }
 
   if (!payload.mode) {
     throw new AppError('mode is required', 400, 'VALIDATION_ERROR');
   }
 
-  if (!payload.requestParams || typeof payload.requestParams !== 'object' || Array.isArray(payload.requestParams)) {
-    throw new AppError('requestParams is required and must be an object', 400, 'VALIDATION_ERROR');
-  }
+  const requestParams = normalizeRequestParams(payload);
 
   const responseProfile = payload.responseProfile || 'standard';
   if (!SUPPORTED_RESPONSE_PROFILES.has(responseProfile)) {
     throw new AppError(`responseProfile must be one of: ${Array.from(SUPPORTED_RESPONSE_PROFILES).join(', ')}`, 400, 'VALIDATION_ERROR');
   }
 
-  const { requestParams } = payload;
   validateBbox(requestParams.bbox);
   validateTiles(requestParams.tiles);
   validateDate(requestParams.dateFrom, 'dateFrom');
@@ -42,11 +40,11 @@ function normalizeRequest(payload) {
   validateDate(requestParams.date, 'date');
 
   return {
-    source: String(payload.source).trim().toLowerCase(),
+    source: String(source).trim().toLowerCase(),
     mode: String(payload.mode || env.copernicus.apiMode).trim().toLowerCase(),
     collection: payload.collection ? String(payload.collection).trim() : 'sentinel-2-l2a',
     datasetType: String(payload.datasetType || 'catalogue').trim().toLowerCase(),
-    format: String(payload.format || 'json').trim().toLowerCase(),
+    format: String(payload.format || requestParams.format || 'json').trim().toLowerCase(),
     responseProfile,
     query: {
       bbox: requestParams.bbox,
@@ -59,7 +57,7 @@ function normalizeRequest(payload) {
       scene: requestParams.scene || null,
       product: requestParams.product || '',
       tiles: normalizeTiles(requestParams.tiles),
-      date: requestParams.date || '',
+      date: requestParams.date || requestParams.dateFrom || '',
       tileName: requestParams.tileName || requestParams.tile_name || 'tile',
       tileSize: normalizeTileSize(requestParams.tileSize || requestParams.tile_size || 400),
       imageKeys: normalizeImageKeys(requestParams.imageKeys || requestParams.image_keys || ['true_color']),
@@ -72,6 +70,53 @@ function normalizeRequest(payload) {
       download: payload.download === true
     }
   };
+}
+
+function normalizeRequestParams(payload) {
+  if (payload.requestParams !== undefined) {
+    if (!payload.requestParams || typeof payload.requestParams !== 'object' || Array.isArray(payload.requestParams)) {
+      throw new AppError('requestParams must be an object when provided', 400, 'VALIDATION_ERROR');
+    }
+
+    return payload.requestParams;
+  }
+
+  const fields = [
+    'bbox',
+    'dateFrom',
+    'dateTo',
+    'date',
+    'cloudCoverageMax',
+    'maxCloudCoverage',
+    'maxCloudPct',
+    'limit',
+    'maxImages',
+    'scene',
+    'product',
+    'tiles',
+    'tileName',
+    'tileSize',
+    'imageKeys',
+    'outputFormat',
+    'format',
+    'crs',
+    'upsampling',
+    'downsampling'
+  ];
+
+  const flatParams = fields.reduce((params, field) => {
+    if (payload[field] !== undefined) {
+      params[field] = payload[field];
+    }
+
+    return params;
+  }, {});
+
+  if (Object.keys(flatParams).length === 0) {
+    throw new AppError('requestParams or flat request query parameters are required', 400, 'VALIDATION_ERROR');
+  }
+
+  return flatParams;
 }
 
 function validateTiles(tiles) {

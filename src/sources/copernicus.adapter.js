@@ -126,6 +126,7 @@ class CopernicusAdapter extends BaseSourceAdapter {
       collection: normalizedRequest.collection,
       returnedItems: Array.isArray(rawData.features) ? rawData.features.length : 1,
       contentType: response.headers ? response.headers['content-type'] : undefined,
+      contentDisposition: response.headers ? response.headers['content-disposition'] : undefined,
       sizeBytes: Buffer.isBuffer(rawData) ? rawData.length : undefined,
       queriedAt: new Date().toISOString()
     };
@@ -346,3 +347,6 @@ class CopernicusAdapter extends BaseSourceAdapter {
 }
 
 module.exports = CopernicusAdapter;
+
+
+
