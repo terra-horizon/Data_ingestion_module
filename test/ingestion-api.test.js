@@ -1,6 +1,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const http = require('node:http');
+const { Readable } = require('node:stream');
 
 function readBody(req) {
   return new Promise((resolve) => {
@@ -30,7 +31,7 @@ async function withMockProvider(handler, testFn) {
   }
 }
 
-function loadFreshApp(envOverrides) {
+function loadFreshApp(envOverrides, objectStorageStub) {
   Object.assign(process.env, envOverrides);
 
   for (const key of Object.keys(require.cache)) {
@@ -39,7 +40,76 @@ function loadFreshApp(envOverrides) {
     }
   }
 
+  if (objectStorageStub) {
+    const objectStoragePath = require.resolve('../src/storage/objectStorage.service');
+    require.cache[objectStoragePath] = {
+      id: objectStoragePath,
+      filename: objectStoragePath,
+      loaded: true,
+      exports: objectStorageStub
+    };
+  }
+
+  const persistencePath = require.resolve('../src/services/persistence.service');
+  require.cache[persistencePath] = {
+    id: persistencePath,
+    filename: persistencePath,
+    loaded: true,
+    exports: {
+      assertConfigured() {},
+      async persistResult(payload, result) {
+        const persistedResult = JSON.parse(JSON.stringify(result));
+        stripBase64Artifacts(persistedResult.data);
+
+        return {
+          result: persistedResult,
+          persistence: {
+            requestId: 'test-request-id',
+            status: 'completed',
+            metadataId: 'test-metadata-id',
+            storage: {
+              bucket: 'test-bucket',
+              objects: [
+                {
+                  key: 'use-cases/test/result.json',
+                  contentType: 'application/json',
+                  extension: '.json',
+                  sizeBytes: 123
+                }
+              ]
+            },
+            error: null
+          }
+        };
+      }
+    }
+  };
+
   return require('../src/app');
+}
+
+function stripBase64Artifacts(value) {
+  if (!value || typeof value !== 'object') {
+    return;
+  }
+
+  if (Array.isArray(value)) {
+    value.forEach(stripBase64Artifacts);
+    return;
+  }
+
+  if (typeof value.dataBase64 === 'string') {
+    delete value.dataBase64;
+    value.storage = {
+      bucket: 'test-bucket',
+      key: `use-cases/test/${value.imageKey || 'artifact'}.png`,
+      contentType: value.contentType || 'image/png',
+      extension: '.png',
+      sizeBytes: value.sizeBytes || 0
+    };
+  }
+
+  Object.values(value).forEach(stripBase64Artifacts);
 }
 
 function startApp(app) {
@@ -173,6 +243,7 @@ test('POST /api/ingestion/run returns Sentinel-2 water-quality statistics', asyn
     assert.equal(response.body.success, true);
     assert.equal(response.body.data[0].date, '2025-01-01');
     assert.equal(typeof response.body.data[0].metrics.Chl_a, 'number');
+    assert.equal(response.body.persistence.status, 'completed');
   });
 });
 
@@ -191,6 +262,7 @@ test('POST /api/ingestion/run returns Sentinel-3 surface temperature', async () 
 
     assert.equal(response.status, 200);
     assert.equal(Number(response.body.data[0].metrics.s3_surface_temperature.toFixed(2)), 18.42);
+    assert.equal(response.body.persistence.metadataId, 'test-metadata-id');
   });
 });
 
@@ -211,10 +283,11 @@ test('POST /api/ingestion/run returns water tile screening', async () => {
     assert.equal(response.status, 200);
     assert.equal(response.body.data[0].tileName, 'tile_0');
     assert.equal(response.body.data[0].selected, true);
+    assert.equal(response.body.persistence.storage.bucket, 'test-bucket');
   });
 });
 
-test('POST /api/ingestion/run returns target-date image as base64', async () => {
+test('POST /api/ingestion/run returns target-date image storage reference without base64', async () => {
   await withMockProvider(providerHandler, async (mockBaseUrl) => {
     const response = await runApiRequest(mockBaseUrl, {
       source: 'copernicus',
@@ -232,10 +305,34 @@ test('POST /api/ingestion/run returns target-date image as base64', async () => 
 
     assert.equal(response.status, 200);
     assert.equal(response.body.data[0].status, 'available');
-    assert.equal(response.body.data[0].dataBase64, Buffer.from('mock-image').toString('base64'));
+    assert.equal(response.body.data[0].dataBase64, undefined);
+    assert.equal(response.body.data[0].storage.contentType, 'image/png');
+    assert.match(response.body.data[0].storage.key, /\.png$/);
+    assert.equal(response.body.persistence.status, 'completed');
   });
 });
 
+
+test('POST /api/ingestion/run persists even when persist is false', async () => {
+  await withMockProvider(providerHandler, async (mockBaseUrl) => {
+    const response = await runApiRequest(mockBaseUrl, {
+      source: 'copernicus',
+      mode: 'sentinel-hub-statistics',
+      responseProfile: 'water-quality-statistics',
+      persist: false,
+      requestParams: {
+        bbox: [22.1, 39.4, 22.8, 40.1],
+        dateFrom: '2025-01-01',
+        dateTo: '2025-01-31',
+        maxCloudCoverage: 30
+      }
+    });
+
+    assert.equal(response.status, 200);
+    assert.equal(response.body.persistence.status, 'completed');
+    assert.equal(response.body.persistence.metadataId, 'test-metadata-id');
+  });
+});
 test('POST /api/ingestion/run returns 400 for unsupported profile', async () => {
   await withMockProvider(providerHandler, async (mockBaseUrl) => {
     const response = await runApiRequest(mockBaseUrl, {
@@ -253,4 +350,66 @@ test('POST /api/ingestion/run returns 400 for unsupported profile', async () => 
     assert.equal(response.body.success, false);
     assert.equal(response.body.error.code, 'UNSUPPORTED_PROFILE');
   });
+});
+
+
+
+
+test('GET /api/ingestion/assets streams persisted TIFF assets and supports forced download', async () => {
+  const assetKey = 'ingestions/2026/07/08/test-ingestion/assets/scene-download-test.tif';
+  const assetBytes = Buffer.from([0x49, 0x49, 0x2a, 0x00]);
+  const app = loadFreshApp({}, {
+    async getObject(key) {
+      assert.equal(key, assetKey);
+      return {
+        contentType: 'image/tiff',
+        sizeBytes: assetBytes.length,
+        stream: Readable.from(assetBytes)
+      };
+    }
+  });
+  const { server, baseUrl } = await startApp(app);
+
+  try {
+    const response = await fetch(`${baseUrl}/api/ingestion/assets?key=${encodeURIComponent(assetKey)}&download=true`);
+    const body = Buffer.from(await response.arrayBuffer());
+
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get('content-type'), 'image/tiff');
+    assert.equal(response.headers.get('content-length'), String(assetBytes.length));
+    assert.equal(response.headers.get('content-disposition'), 'attachment; filename="scene-download-test.tif"');
+    assert.deepEqual(body, assetBytes);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
+});
+
+test('GET /api/ingestion/assets accepts quoted keys and pasted asset URLs', async () => {
+  const assetKey = 'ingestions/2026/07/08/test-ingestion/assets/scene-download-test.tif';
+  const assetBytes = Buffer.from([0x49, 0x49, 0x2a, 0x00]);
+  const seenKeys = [];
+  const app = loadFreshApp({}, {
+    async getObject(key) {
+      seenKeys.push(key);
+      return {
+        contentType: 'image/tiff',
+        sizeBytes: assetBytes.length,
+        stream: Readable.from(assetBytes)
+      };
+    }
+  });
+  const { server, baseUrl } = await startApp(app);
+
+  try {
+    const quotedResponse = await fetch(`${baseUrl}/api/ingestion/assets?key=${encodeURIComponent(`"${assetKey}"`)}`);
+    assert.equal(quotedResponse.status, 200);
+
+    const pastedUrl = `/api/ingestion/assets?key=${encodeURIComponent(assetKey)}&download=true`;
+    const pastedResponse = await fetch(`${baseUrl}/api/ingestion/assets?key=${encodeURIComponent(pastedUrl)}`);
+    assert.equal(pastedResponse.status, 200);
+
+    assert.deepEqual(seenKeys, [assetKey, assetKey]);
+  } finally {
+    await new Promise((resolve) => server.close(resolve));
+  }
 });
