@@ -5,7 +5,9 @@
   "main": "src/server.js",
   "scripts": {
     "dev": "nodemon src/server.js",
-    "start": "node src/server.js"
+    "start": "node src/server.js",
+    "test": "node --test test/*.test.js",
+    "test:integration": "cross-env RUN_INTEGRATION_TESTS=true node --test test/integration/*.test.js"
   },
   "keywords": [
     "data-ingestion",
@@ -22,9 +24,12 @@
     "express": "^4.22.2",
     "express-async-handler": "^1.2.0",
     "helmet": "^8.2.0",
+    "minio": "^8.0.7",
+    "mongodb": "^7.5.0",
     "morgan": "^1.10.1"
   },
   "devDependencies": {
+    "cross-env": "^10.1.0",
     "nodemon": "^3.1.14"
   }
 }
