@@ -1,6 +1,7 @@
 const app = require('./app');
 const env = require('./config/env');
 const logger = require('./utils/logger');
+const { closePersistence } = require('./config/persistence');
 
 const server = app.listen(env.port, () => {
   logger.info('Data ingestion API listening', {
@@ -17,8 +18,14 @@ server.on('error', (error) => {
 async function shutdown(signal) {
   logger.info('Shutting down API', { signal });
 
-  server.close(() => {
-    process.exit(0);
+  server.close(async () => {
+    try {
+      await closePersistence();
+      process.exit(0);
+    } catch (error) {
+      logger.error('Persistence shutdown failed', { error: error.message });
+      process.exit(1);
+    }
   });
 }
 
