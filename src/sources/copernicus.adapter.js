@@ -1,167 +1,151 @@
-const axios = require('axios');
 const BaseSourceAdapter = require('./base-source.adapter');
+const CopernicusAuth = require('./copernicus-auth');
 const env = require('../config/env');
 const AppError = require('../utils/app-error');
 const { httpClient, normalizeHttpError } = require('../utils/http-client');
 
+const RETRYABLE_STATUSES = new Set([429, 500, 502, 503, 504]);
+
 class CopernicusAdapter extends BaseSourceAdapter {
-  getName() {
-    return 'copernicus';
+  constructor(options = {}) {
+    super();
+    this.config = options.config || env;
+    this.client = options.client || httpClient;
+    this.sleep = options.sleep || ((milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds)));
+    this.auth = options.auth || new CopernicusAuth({ config: this.config.copernicus, client: this.client });
   }
 
-  async healthCheck() {
-    const response = await httpClient.get(env.copernicus.stacBaseUrl);
+  getName() { return 'copernicus'; }
 
+  async healthCheck() {
+    const response = await this.client.get(this.config.copernicus.stacBaseUrl);
     return {
       source: this.getName(),
       healthy: response.status >= 200 && response.status < 300,
-      mode: env.copernicus.apiMode,
-      stacBaseUrl: env.copernicus.stacBaseUrl
+      mode: this.config.copernicus.apiMode,
+      stacBaseUrl: this.config.copernicus.stacBaseUrl
     };
   }
 
-  validateRequest(normalizedRequest) {
-    if (!['stac', 'sentinel-hub-catalog', 'sentinel-hub-process'].includes(normalizedRequest.mode)) {
-      throw new AppError('Only Copernicus stac, sentinel-hub-catalog, and sentinel-hub-process modes are currently implemented', 400, 'UNSUPPORTED_MODE');
+  validateRequest(request) {
+    const modes = ['stac', 'sentinel-hub-catalog', 'sentinel-hub-process', 'sentinel-hub-statistics'];
+    if (!modes.includes(request.mode)) {
+      throw new AppError(`Copernicus mode must be one of: ${modes.join(', ')}`, 400, 'UNSUPPORTED_MODE');
     }
-
-    if (normalizedRequest.options.download && normalizedRequest.mode !== 'sentinel-hub-process') {
-      throw new AppError('Product downloads are not enabled in this stateless module', 400, 'DOWNLOAD_NOT_SUPPORTED');
+    if (request.options.download && request.mode !== 'sentinel-hub-process') {
+      throw new AppError('Product downloads are only supported in sentinel-hub-process mode', 400, 'DOWNLOAD_NOT_SUPPORTED');
     }
-
-    if (normalizedRequest.mode === 'sentinel-hub-process' && !normalizedRequest.query.scene) {
+    if (request.mode === 'sentinel-hub-process' && !request.query.scene) {
       throw new AppError('sentinel-hub-process mode requires requestParams.scene', 400, 'VALIDATION_ERROR');
     }
+    if (['sentinel-hub-catalog', 'sentinel-hub-process', 'sentinel-hub-statistics'].includes(request.mode) && !request.query.bbox) {
+      throw new AppError(`${request.mode} requires requestParams.bbox`, 400, 'VALIDATION_ERROR');
+    }
   }
 
-  buildExternalRequest(normalizedRequest) {
-    if (normalizedRequest.mode === 'sentinel-hub-catalog') {
-      return this.buildSentinelHubCatalogRequest(normalizedRequest);
-    }
-
-    if (normalizedRequest.mode === 'sentinel-hub-process') {
-      return this.buildSentinelHubProcessRequest(normalizedRequest);
-    }
-
-    return this.buildStacRequest(normalizedRequest);
+  buildExternalRequest(request) {
+    if (request.mode === 'sentinel-hub-catalog') return this.buildSentinelHubCatalogRequest(request);
+    if (request.mode === 'sentinel-hub-process') return this.buildSentinelHubProcessRequest(request);
+    if (request.mode === 'sentinel-hub-statistics') return this.buildSentinelHubStatisticsRequest(request);
+    return this.buildStacRequest(request);
   }
 
-  async fetchData(normalizedRequest) {
-    this.validateRequest(normalizedRequest);
-    const externalRequest = this.buildExternalRequest(normalizedRequest);
+  async fetchData(request) {
+    this.validateRequest(request);
+    const externalRequest = this.buildExternalRequest(request);
 
     try {
-      const response = normalizedRequest.mode === 'sentinel-hub-catalog'
-        ? await this.postSentinelHubCatalog(externalRequest)
-        : normalizedRequest.mode === 'sentinel-hub-process'
-          ? await this.postSentinelHubProcess(externalRequest)
-        : await httpClient.post(externalRequest.url, externalRequest.body, {
-          headers: await this.buildHeaders()
-        });
-      const rawData = response.data;
+      let response;
+      if (request.mode === 'stac') response = await this.fetchStacPages(externalRequest);
+      else response = await this.postAuthenticated(externalRequest, request.mode === 'sentinel-hub-process' ? 'arraybuffer' : 'json');
 
+      const rawData = response.data;
       return {
         rawData,
         externalRequest,
         metadata: {
           source: this.getName(),
-          mode: normalizedRequest.mode,
-          collection: normalizedRequest.collection,
-          returnedItems: Array.isArray(rawData.features) ? rawData.features.length : 1,
+          mode: request.mode,
+          collection: request.collection,
+          returnedItems: Array.isArray(rawData.features) ? rawData.features.length : Array.isArray(rawData.data) ? rawData.data.length : 1,
           contentType: response.headers ? response.headers['content-type'] : undefined,
-          sizeBytes: Buffer.isBuffer(rawData) ? rawData.length : undefined,
+          sizeBytes: Buffer.isBuffer(rawData) ? rawData.length : Buffer.byteLength(JSON.stringify(rawData || null)),
           queriedAt: new Date().toISOString()
         }
       };
     } catch (error) {
-      if (error instanceof AppError) {
-        throw error;
-      }
-
-      throw normalizeHttpError(error, `Copernicus ${normalizedRequest.mode} search failed`);
+      if (error instanceof AppError) throw error;
+      throw normalizeHttpError(error, `Copernicus ${request.mode} request failed`);
     }
   }
 
-  extractMetadata(rawResponse) {
-    return rawResponse.metadata;
+  extractMetadata(rawResponse) { return rawResponse.metadata; }
+
+  buildStacRequest(request) {
+    const body = { collections: [request.collection], limit: request.query.limit };
+    if (request.query.bbox) body.bbox = request.query.bbox;
+    if (request.query.dateFrom || request.query.dateTo) body.datetime = this.toStacDatetime(request.query.dateFrom, request.query.dateTo);
+    if (request.query.cloudCoverageMax !== null) body.query = { 'eo:cloud_cover': { lte: request.query.cloudCoverageMax } };
+    return { method: 'POST', url: `${this.config.copernicus.stacBaseUrl.replace(/\/$/, '')}/search`, body };
   }
 
-  buildStacRequest(normalizedRequest) {
+  buildSentinelHubCatalogRequest(request) {
     const body = {
-      collections: [normalizedRequest.collection],
-      limit: normalizedRequest.query.limit
+      bbox: request.query.bbox,
+      datetime: this.toStacDatetime(request.query.dateFrom, request.query.dateTo),
+      collections: [request.collection],
+      limit: Math.min(100, Math.max(request.query.maxImages * 4, 40))
     };
-
-    if (normalizedRequest.query.bbox) {
-      body.bbox = normalizedRequest.query.bbox;
-    }
-
-    if (normalizedRequest.query.dateFrom || normalizedRequest.query.dateTo) {
-      body.datetime = this.toStacDatetime(normalizedRequest.query.dateFrom, normalizedRequest.query.dateTo);
-    }
-
-    if (normalizedRequest.query.cloudCoverageMax !== null && normalizedRequest.query.cloudCoverageMax !== undefined) {
-      body.query = {
-        'eo:cloud_cover': {
-          lte: Number(normalizedRequest.query.cloudCoverageMax)
-        }
-      };
-    }
-
-    return {
-      method: 'POST',
-      url: `${env.copernicus.stacBaseUrl.replace(/\/$/, '')}/search`,
-      body
-    };
+    if (request.query.cloudCoverageMax !== null) body.filter = `eo:cloud_cover <= ${request.query.cloudCoverageMax}`;
+    return { method: 'POST', url: this.config.copernicus.shCatalogUrl, body };
   }
 
-  buildSentinelHubCatalogRequest(normalizedRequest) {
+  buildSentinelHubStatisticsRequest(request) {
     return {
       method: 'POST',
-      url: env.copernicus.shCatalogUrl,
-      body: {
-        bbox: normalizedRequest.query.bbox,
-        datetime: this.toStacDatetime(normalizedRequest.query.dateFrom, normalizedRequest.query.dateTo),
-        collections: [normalizedRequest.collection],
-        limit: Math.min(100, Math.max(normalizedRequest.query.maxImages * 4, 40))
-      }
-    };
-  }
-
-  buildSentinelHubProcessRequest(normalizedRequest) {
-    const scene = normalizedRequest.query.scene;
-    const [from, to] = this.sceneTimeWindow(scene.datetime);
-    const [width, height] = this.bboxDimensionsFor10m(normalizedRequest.query.bbox);
-
-    return {
-      method: 'POST',
-      url: env.copernicus.shProcessUrl,
+      url: this.config.copernicus.shStatisticsUrl,
       body: {
         input: {
           bounds: {
-            bbox: normalizedRequest.query.bbox,
+            bbox: request.query.bbox,
             properties: { crs: 'http://www.opengis.net/def/crs/EPSG/0/4326' }
           },
-          data: [
-            {
-              type: normalizedRequest.collection,
-              dataFilter: {
-                timeRange: { from, to },
-                mosaickingOrder: 'leastCC'
-              }
+          data: [{
+            type: request.collection,
+            dataFilter: {
+              timeRange: {
+                from: this.startOfDay(request.query.dateFrom),
+                to: this.endOfDay(request.query.dateTo)
+              },
+              ...(request.query.cloudCoverageMax !== null ? { maxCloudCoverage: request.query.cloudCoverageMax } : {})
             }
-          ]
+          }]
         },
-        output: {
-          responses: [
-            {
-              identifier: 'default',
-              format: { type: 'image/tiff' }
-            }
-          ],
-          width,
-          height
+        aggregation: {
+          timeRange: {
+            from: this.startOfDay(request.query.dateFrom),
+            to: this.endOfDay(request.query.dateTo)
+          },
+          aggregationInterval: { of: 'P1D' },
+          evalscript: this.statisticsEvalscript()
+        }
+      }
+    };
+  }
+
+  buildSentinelHubProcessRequest(request) {
+    const scene = request.query.scene;
+    const [from, to] = this.sceneTimeWindow(scene.datetime);
+    const [width, height] = this.bboxDimensionsFor10m(request.query.bbox);
+    return {
+      method: 'POST',
+      url: this.config.copernicus.shProcessUrl,
+      body: {
+        input: {
+          bounds: { bbox: request.query.bbox, properties: { crs: 'http://www.opengis.net/def/crs/EPSG/0/4326' } },
+          data: [{ type: request.collection, dataFilter: { timeRange: { from, to }, mosaickingOrder: 'leastCC' } }]
         },
+        output: { responses: [{ identifier: 'default', format: { type: 'image/tiff' } }], width, height },
         evalscript: this.rawBandsEvalscript()
       },
       scene,
@@ -170,129 +154,168 @@ class CopernicusAdapter extends BaseSourceAdapter {
     };
   }
 
-  async buildHeaders() {
-    const headers = {};
+  async fetchStacPages(initialRequest) {
+    let current = initialRequest;
+    const features = [];
+    let lastResponse = null;
+    const seen = new Set();
 
-    if (env.copernicus.accessToken) {
-      headers.Authorization = `Bearer ${env.copernicus.accessToken}`;
+    while (current) {
+      const requestKey = JSON.stringify([current.method, current.url, current.body || null]);
+      if (seen.has(requestKey)) break;
+      seen.add(requestKey);
+      lastResponse = await this.requestWithRetry(current, false);
+      const body = lastResponse.data || {};
+      features.push(...(Array.isArray(body.features) ? body.features : []));
+      const next = (body.links || []).find((link) => link.rel === 'next' && link.href);
+      current = next ? {
+        method: String(next.method || 'GET').toUpperCase(),
+        url: next.href,
+        body: next.body || undefined
+      } : null;
     }
 
-    return headers;
+    return {
+      ...lastResponse,
+      data: { ...(lastResponse ? lastResponse.data : {}), features, links: [] }
+    };
   }
 
-  async postSentinelHubCatalog(externalRequest) {
-    return axios.post(externalRequest.url, externalRequest.body, {
-      timeout: env.requestTimeoutMs,
-      headers: {
-        Authorization: `Bearer ${await this.getAccessToken()}`,
-        'Content-Type': 'application/json'
-      }
-    });
-  }
+  async postAuthenticated(request, responseType) {
+    let retryAttempt = 1;
+    let forceRefresh = false;
+    let requestCount = 0;
+    const credentialCount = Math.max(this.config.copernicus.credentialSets.length, 1);
+    const requestLimit = this.config.retryAttempts * (credentialCount + 2);
 
-  async postSentinelHubProcess(externalRequest) {
-    const response = await axios.post(externalRequest.url, externalRequest.body, {
-      timeout: 180000,
-      responseType: 'arraybuffer',
-      headers: {
-        Authorization: `Bearer ${await this.getAccessToken()}`,
-        'Content-Type': 'application/json',
-        Accept: 'image/tiff'
-      },
-      validateStatus: () => true
-    });
-
-    if (response.status !== 200) {
-      const snippet = Buffer.from(response.data || '').toString('utf8').slice(0, 500);
-      throw new AppError(`CDSE process error ${response.status}: ${snippet}`, 502, 'EXTERNAL_API_ERROR');
-    }
-
-    return response;
-  }
-
-  async getAccessToken() {
-    if (env.copernicus.accessToken) {
-      return env.copernicus.accessToken;
-    }
-
-    if (!env.copernicus.clientId || !env.copernicus.clientSecret) {
-      throw new AppError('sentinel-hub-catalog mode requires COPERNICUS_ACCESS_TOKEN or COPERNICUS_CLIENT_ID/COPERNICUS_CLIENT_SECRET', 503, 'COPERNICUS_AUTH_MISSING');
-    }
-
-    try {
-      const form = new URLSearchParams();
-      form.set('grant_type', 'client_credentials');
-      form.set('client_id', env.copernicus.clientId);
-      form.set('client_secret', env.copernicus.clientSecret);
-
-      const response = await httpClient.post(env.copernicus.tokenUrl, form.toString(), {
-        headers: {
-          Accept: 'application/json',
-          'Content-Type': 'application/x-www-form-urlencoded'
-        }
-      });
-
-      if (!response.data.access_token) {
-        throw new AppError('Copernicus token response did not include access_token', 502, 'COPERNICUS_AUTH_ERROR');
+    while (retryAttempt <= this.config.retryAttempts && requestCount < requestLimit) {
+      requestCount += 1;
+      const token = await this.auth.getAccessToken({ forceRefresh });
+      forceRefresh = false;
+      let response;
+      try {
+        response = await this.client.request({
+          method: request.method,
+          url: request.url,
+          data: request.body,
+          timeout: request.url === this.config.copernicus.shProcessUrl ? 180000 : this.config.requestTimeoutMs,
+          responseType,
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+            Accept: responseType === 'arraybuffer' ? 'image/tiff' : 'application/json'
+          },
+          validateStatus: () => true
+        });
+      } catch (error) {
+        if (retryAttempt === this.config.retryAttempts) throw normalizeHttpError(error, 'Copernicus request failed');
+        await this.waitBeforeRetry(retryAttempt);
+        retryAttempt += 1;
+        continue;
       }
 
-      return response.data.access_token;
-    } catch (error) {
-      if (error instanceof AppError) {
-        throw error;
+      if (response.status >= 200 && response.status < 300) return response;
+      if (response.status === 401) {
+        this.auth.invalidateCurrentToken();
+        forceRefresh = true;
+        continue;
       }
+      if ((response.status === 403 || response.status === 429) && this.auth.moveToNextCredential()) {
+        continue;
+      }
+      if (RETRYABLE_STATUSES.has(response.status) && retryAttempt < this.config.retryAttempts) {
+        await this.waitBeforeRetry(retryAttempt, response.headers && response.headers['retry-after']);
+        retryAttempt += 1;
+        continue;
+      }
+      throw this.externalStatusError(response, request.url);
+    }
 
-      throw normalizeHttpError(error, 'Copernicus token request failed');
+    throw new AppError('Copernicus request exhausted its retry budget', 502, 'EXTERNAL_API_ERROR', { retryable: true });
+  }
+
+  async requestWithRetry(request) {
+    for (let attempt = 1; attempt <= this.config.retryAttempts; attempt += 1) {
+      let response;
+      try {
+        response = await this.client.request({
+          method: request.method,
+          url: request.url,
+          data: request.body,
+          timeout: this.config.requestTimeoutMs,
+          validateStatus: () => true
+        });
+      } catch (error) {
+        if (attempt === this.config.retryAttempts) throw normalizeHttpError(error, 'Copernicus STAC request failed');
+        await this.waitBeforeRetry(attempt);
+        continue;
+      }
+      if (response.status >= 200 && response.status < 300) return response;
+      if (RETRYABLE_STATUSES.has(response.status) && attempt < this.config.retryAttempts) {
+        await this.waitBeforeRetry(attempt, response.headers && response.headers['retry-after']);
+        continue;
+      }
+      throw this.externalStatusError(response, request.url);
     }
   }
 
-  toStacDatetime(dateFrom, dateTo) {
-    const from = dateFrom ? `${dateFrom}T00:00:00Z` : '..';
-    const to = dateTo ? `${dateTo}T23:59:59Z` : '..';
-
-    return `${from}/${to}`;
+  externalStatusError(response, url) {
+    const detail = response.data && (response.data.message || response.data.error || response.data.detail);
+    return new AppError(
+      `Copernicus request failed with ${response.status}${detail ? `: ${detail}` : ''}`,
+      502,
+      'EXTERNAL_API_ERROR',
+      { retryable: RETRYABLE_STATUSES.has(response.status), details: { externalStatus: response.status, url } }
+    );
   }
+
+  async waitBeforeRetry(attempt, retryAfter) {
+    const seconds = Number(retryAfter);
+    const delay = Number.isFinite(seconds) && seconds >= 0
+      ? Math.min(seconds * 1000, 60000)
+      : this.config.retryBaseDelayMs * (2 ** (attempt - 1));
+    await this.sleep(delay);
+  }
+
+  toStacDatetime(from, to) { return `${from ? this.startOfDay(from) : '..'}/${to ? this.endOfDay(to) : '..'}`; }
+  startOfDay(value) { return `${String(value).slice(0, 10)}T00:00:00Z`; }
+  endOfDay(value) { return `${String(value).slice(0, 10)}T23:59:59Z`; }
 
   sceneTimeWindow(sceneDatetime) {
     const timestamp = Date.parse(sceneDatetime);
-    if (Number.isNaN(timestamp)) {
-      throw new AppError('scene.datetime must be a valid date', 400, 'VALIDATION_ERROR');
-    }
-
-    const twelveHoursMs = 12 * 60 * 60 * 1000;
-    return [
-      new Date(timestamp - twelveHoursMs).toISOString().replace('.000Z', 'Z'),
-      new Date(timestamp + twelveHoursMs).toISOString().replace('.000Z', 'Z')
-    ];
+    if (Number.isNaN(timestamp)) throw new AppError('scene.datetime must be a valid date', 400, 'VALIDATION_ERROR');
+    const twelveHours = 12 * 60 * 60 * 1000;
+    return [new Date(timestamp - twelveHours).toISOString().replace('.000Z', 'Z'), new Date(timestamp + twelveHours).toISOString().replace('.000Z', 'Z')];
   }
 
   bboxDimensionsFor10m(bbox) {
     const [minLon, minLat, maxLon, maxLat] = bbox;
-    const lonSpan = Math.max(1e-8, Number(maxLon) - Number(minLon));
-    const latSpan = Math.max(1e-8, Number(maxLat) - Number(minLat));
-    const latMid = (Number(minLat) + Number(maxLat)) / 2.0;
-    const cosLat = Math.max(Math.cos(latMid * Math.PI / 180), 0.1);
-    const metersX = lonSpan * 111320.0 * cosLat;
-    const metersY = latSpan * 110540.0;
-
+    const cosLat = Math.max(Math.cos(((minLat + maxLat) / 2) * Math.PI / 180), 0.1);
     return [
-      Math.min(Math.max(Math.ceil(metersX / 10.0), 64), 2500),
-      Math.min(Math.max(Math.ceil(metersY / 10.0), 64), 2500)
+      Math.min(Math.max(Math.ceil((maxLon - minLon) * 111320 * cosLat / 10), 64), 2500),
+      Math.min(Math.max(Math.ceil((maxLat - minLat) * 110540 / 10), 64), 2500)
     ];
+  }
+
+  statisticsEvalscript() {
+    return `//VERSION=3
+      function setup() {
+        return {
+          input: [{ bands: ["B01", "B02", "B03", "B04", "B08", "dataMask"] }],
+          output: [{ id: "data", bands: 5 }, { id: "dataMask", bands: 1 }]
+        };
+      }
+      function evaluatePixel(sample) {
+        return { data: [sample.B01, sample.B02, sample.B03, sample.B04, sample.B08], dataMask: [sample.dataMask] };
+      }`;
   }
 
   rawBandsEvalscript() {
     return `//VERSION=3
       function setup() {
-        return {
-          input: [{ bands: ["B02", "B03", "B04", "B08", "B11"], units: "REFLECTANCE" }],
-          output: { bands: 5, sampleType: "FLOAT32" }
-        };
+        return { input: [{ bands: ["B02", "B03", "B04", "B08", "B11"], units: "REFLECTANCE" }], output: { bands: 5, sampleType: "FLOAT32" } };
       }
-
-      function evaluatePixel(sample) {
-        return [sample.B02, sample.B03, sample.B04, sample.B08, sample.B11];
-      }`;
+      function evaluatePixel(sample) { return [sample.B02, sample.B03, sample.B04, sample.B08, sample.B11]; }`;
   }
 }
 
