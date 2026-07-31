@@ -2,11 +2,11 @@
 
 Alpha stateless HTTP Data Ingestion Module for TERRA services.
 
-This is an alpha version of the wider TERRA Data Ingestion Module. It focuses on validating external-provider calls, Copernicus/CDSE integration, request normalization, and response wrappers. It intentionally does not yet implement MongoDB persistence, MinIO storage, IoT ingestion, full external repository coverage, DAG progression, or orchestrator callback reporting.
+This is an alpha version of the wider TERRA Data Ingestion Module. It focuses on validating external-provider calls, Copernicus/CDSE integration, request normalization, response wrappers, and optional MongoDB/MinIO persistence. It does not yet implement IoT ingestion, full external repository coverage, DAG progression, or orchestrator callback reporting.
 
 Other TERRA modules call this service instead of calling external providers directly. The module receives a request, calls the external provider, wraps or transforms the provider response, and returns the result to the caller.
 
-It does not store jobs, datasets, files, database rows, ingestion history, or workflow state. In this alpha version, an external orchestrator is responsible for job tracking, retries, persistence, pipeline progression, DB updates, and storage.
+When persistence is enabled, normalized metadata is stored in MongoDB and validated binary assets are stored in S3-compatible MinIO. The external orchestrator remains responsible for workflow progression and scheduling.
 
 ## Architecture
 
@@ -17,6 +17,7 @@ HTTP request
 -> request normalizer
 -> source adapter
 -> wrapper
+-> optional validation and MongoDB/MinIO persistence
 -> stateless HTTP response
 ```
 
@@ -68,6 +69,28 @@ COPERNICUS_CLIENT_ID=
 COPERNICUS_CLIENT_SECRET=
 ```
 
+### MongoDB and MinIO
+
+The application uses the services created by `terra-node-stack-master`. From Docker, use `terra-mongodb:27017` and the MinIO S3 API at `terra-minio:9000`. From the host, use `localhost:27017` and `localhost:9000`. Port `9001` is the MinIO console and is not used by the application.
+
+```env
+PERSISTENCE_ENABLED=true
+MONGO_URI=mongodb://<service-user>:<service-password>@terra-mongodb:27017/<service-db>?authSource=<service-db>
+MONGO_DB_NAME=<service-db>
+MONGO_INGESTION_COLLECTION=ingestion_results
+MONGO_UC1_TILES_COLLECTION=uc1_tiles
+MONGO_UC1_OBSERVATIONS_COLLECTION=uc1_observations
+S3_ENDPOINT=terra-minio
+S3_PORT=9000
+S3_USE_SSL=false
+S3_ACCESS_KEY=<minio-service-user>
+S3_SECRET_KEY=<minio-service-password>
+S3_BUCKET=terra-bucket
+S3_REGION=us-east-1
+```
+
+The Compose file joins the external `terra-network`; start the node stack's `data` profile first. The stack initializer creates the private bucket and service credentials. The application checks the configured bucket before its first object operation.
+
 For `sentinel-hub-catalog`, configure either `COPERNICUS_ACCESS_TOKEN` or `COPERNICUS_CLIENT_ID` plus `COPERNICUS_CLIENT_SECRET`.
 
 ## Run
@@ -102,7 +125,33 @@ Stop Compose:
 docker compose down
 ```
 
-The container exposes `/api/health` and does not include a database, queue, or storage service.
+The container exposes `/api/health`; MongoDB and MinIO remain separate services in the Terra Node Stack.
+
+## Persistence and tests
+
+Clients may send `Idempotency-Key` or `X-Idempotency-Key` without changing the request body. When persistence is enabled, successful responses include `persisted`, `idempotencyKey`, `recordId`, `operation`, `objectCount`, and `changedEntryCount` in a compact `persistence` object.
+
+Binary payloads are validated, uploaded under deterministic `ingestions/YYYY/MM/DD/...` keys, and replaced in the MongoDB representation by object metadata. Buckets remain private.
+
+Unit tests use in-memory stores and require no Docker services:
+
+```bash
+npm test
+```
+
+Start the node stack data profile and explicitly run real storage tests with:
+
+```bash
+npm run test:integration
+```
+
+Integration objects use the `test/ingestions/` prefix and are removed with their test documents. Verify objects through the S3 API, never through the backend volume:
+
+```bash
+mc alias set local http://localhost:9000 "$S3_ACCESS_KEY" "$S3_SECRET_KEY"
+mc stat local/terra-bucket/<object-key>
+mc cp local/terra-bucket/<object-key> ./downloaded-object
+```
 
 ## Endpoints
 
@@ -110,6 +159,9 @@ The container exposes `/api/health` and does not include a database, queue, or s
 - `GET /api/sources`
 - `GET /api/sources/:source/health`
 - `POST /api/ingestion/run`
+- `GET /api/ingestion/runs/:id`
+- `GET /api/ingestion/runs/:id/status`
+- `GET /api/ingestion/runs/:id/results`
 
 Health response:
 
@@ -188,6 +240,16 @@ Use `responseProfile: "standard"` for the internal T-compatible catalogue object
 ## Copernicus Compatibility Profile
 
 Use `responseProfile: "copernicus-compatibility"` for a simpler product list that is easier for teams migrating away from direct Copernicus calls.
+
+## UC1 AOI Water-Quality Ingestion
+
+The UC1 production collection path is implemented directly in this module; the former
+collector is reference-only and no collector client or second service is used. The
+`aoi-water-quality` operation composes Overpass river acquisition, deterministic river
+tiles, Sentinel-2 discovery/statistics, validation, MongoDB run/tile/observation persistence,
+and MinIO object persistence. See [the collector migration mapping](docs/docs/collector-migration.md)
+for the AOI request, projections and indexes, environment settings, lookup API, and the
+explicit Sentinel-2 image-selection, Sentinel-3, and water-mask limitations.
 
 ## Direct Vs Ingestion Comparison
 

@@ -12,6 +12,7 @@ nav:
     - Architecture: architecture.md
     - API Reference: api-reference.md
     - Workflow: workflow.md
+    - Collector Migration: collector-migration.md
   - Setup & Validation:
     - Deployment: deployment.md
     - Configuration: configuration.md
