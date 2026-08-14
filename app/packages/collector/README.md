@@ -1,23 +1,30 @@
 # TERRA UC1 Data Collection
 
-This folder is the standalone collector module for the TERRA UC1 water-quality pipeline. It owns Sentinel-2 discovery, river tiling, statistical metric collection for every tile, incremental history, validation, and collection state.
+This folder contains the independently installable collector module for the
+TERRA UC1 water-quality pipeline. It owns Sentinel-2 discovery, river tiling,
+statistical metric collection for every tile, incremental history, validation,
+MongoDB persistence, and MinIO publication.
 
-Run this module independently. It owns collection and publishes its stable
-AOI/tile/observation contract for the separately deployed forecaster.
+It is temporarily bundled in the Data Ingestion Module at
+`app/packages/collector`. The FastAPI image installs this directory as the
+`terra-data-collection` package and invokes it through the
+`forecaster-collector` profile. The package can still run independently and
+does not import the FastAPI application.
 
 ## Install
 
 Create an environment and install the package from this folder:
 
 ```bash
-cd collector
+cd app/packages/collector
 python3 -m venv .venv
 source .venv/bin/activate
 python3 -m pip install -e ".[test]"
 ```
 
-Create the repository-root `.env` from `../.env.example`, then set the CDSE,
-MongoDB, and MinIO application credentials. Optional CDSE backup credentials use
+For the FastAPI integration, create the Data Ingestion Module's root `.env`
+from its `.env.example`, then set the CDSE, MongoDB, and MinIO application
+credentials. Optional CDSE backup credentials use
 `CDSE_BACKUP_CLIENT_ID`, `CDSE_BACKUP_CLIENT_SECRET`, and numbered pairs
 through `CDSE_BACKUP_9_*`. Credentials and tokens are never written to output
 files or logs.
@@ -26,20 +33,21 @@ files or logs.
 
 ### Independent collector image
 
-Build the collector without the forecaster package:
+Build the collector independently from the Data Ingestion Module repository
+root:
 
 ```bash
-docker build -t terra-uc1-collector:local collector
+docker build -t terra-uc1-collector:local app/packages/collector
 ```
 
 The image entrypoint is `python collect.py`. Supply the CDSE and storage
 variables through your approved runtime secret mechanism and pass `run` plus
-the normal collector arguments. The forecaster image is built separately from
-the repository-root `Dockerfile` and does not install or import this package.
+the normal collector arguments. The main Data Ingestion Module image instead
+installs this package and calls its Python API through the collector adapter.
 
 ### Simple launcher (no package installation)
 
-From this `collector/` folder, use the included launcher. It calls the same
+From `app/packages/collector`, use the included launcher. It calls the same
 collector CLI, so the next developer does not need to know Python module paths:
 
 ```bash

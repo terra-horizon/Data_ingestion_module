@@ -1,14 +1,14 @@
 # TERRA UC1 Data Contract
 
-This contract connects the standalone collector, the scheduled forecaster,
-MongoDB, and MinIO. The collector writes local JSON/CSV staging artifacts. The
-scheduled pipeline makes JSON/GeoJSON durable in MinIO and stores queryable
+This contract connects the collector, the Data Ingestion Module, downstream
+forecasting processes, MongoDB, and MinIO. The collector writes local JSON/CSV
+staging artifacts, makes JSON/GeoJSON durable in MinIO, and stores queryable
 records in MongoDB.
 
 ## Stable identifiers
 
 - Observation upsert key: `aoi_id + tile_id + observation_date`.
-- AOI identity: stable `aoi_id` from `TERRA_AOI_ID`, plus an
+- AOI identity: stable `aoi_id` supplied in `CollectionRequest`, plus an
   `aoi_definition_hash` calculated from the AOI bbox, CRS, and tile-generation
   parameters. `aoi_id` identifies a physical study area, not an environment
   label such as `dev` or `prod`.
@@ -53,22 +53,25 @@ warnings, and paths to generated artifacts. The JSON representations are in
 - `history-record.schema.json`
 - `river-tiles.schema.json`
 
-The current connector is local Python. A future HTTP service may use the same
-request/result shapes without changing preprocessing or forecasting.
+The FastAPI Data Ingestion Module is the current HTTP boundary. Its
+`forecaster-collector` adapter constructs `CollectionRequest`, invokes the
+local Python package, and returns `CollectionResult` inside an orchestration
+response. The collector remains authoritative for storage and can still be
+invoked through its CLI by independent callers.
 
 ## Pipeline data flow
 
-```mermaid
-flowchart LR
-    A["AOI definition"] --> C["Collector: raw observations"]
-    C --> M["MongoDB: queryable documents"]
-    C --> S["MinIO: canonical JSON/GeoJSON"]
-    C --> P["Preprocessing features"]
-    P --> F["Forecasts"]
-    P --> M
-    P --> S
-    F --> M
-    F --> S
+```text
+AOI definition
+  -> Collector: raw observations
+       |-> MongoDB: queryable documents
+       |-> MinIO: canonical JSON/GeoJSON
+       `-> Preprocessing features
+             |-> MongoDB
+             |-> MinIO
+             `-> Forecasts
+                   |-> MongoDB
+                   `-> MinIO
 ```
 
 ## MongoDB data model
@@ -76,16 +79,19 @@ flowchart LR
 MongoDB stores queryable records. Collections are connected by shared fields;
 MongoDB does not enforce foreign keys.
 
-```mermaid
-flowchart TD
-    A["AOI: aoi_id = sperchios"] --> T["tiles"]
-    T --> O["observations"]
-    T --> F["preprocessed_features"]
-    T --> FC["forecasts"]
-    R["pipeline_runs"] --> O
-    R --> T
-    R --> F
-    R --> FC
+```text
+AOI (aoi_id)
+  |-> tiles
+  |    |-> observations
+  |    |-> preprocessed_features
+  |    `-> forecasts
+  `-> collection_state
+
+pipeline_runs (run_id / last_run_id)
+  |-> tiles
+  |-> observations
+  |-> preprocessed_features
+  `-> forecasts
 ```
 
 | Collection | Purpose | Unique key |
