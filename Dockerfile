@@ -1,19 +1,14 @@
-FROM node:20-slim
+FROM python:3.12-slim
 
 WORKDIR /app
 
-ENV NODE_ENV=production
-ENV PORT=3000
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
 
-COPY package*.json ./
-RUN npm ci --omit=dev
+COPY pyproject.toml README.md ./
+COPY app ./app
+RUN python -m pip install --no-cache-dir ./app/packages/collector .
 
-COPY src ./src
-COPY README.md ./
+EXPOSE 8000
 
-EXPOSE 3000
-
-HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD node -e "const port=process.env.PORT||3000; fetch('http://127.0.0.1:'+port+'/api/health').then((r)=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))"
-
-CMD ["npm", "start"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
