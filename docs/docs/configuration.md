@@ -1,65 +1,67 @@
 # Configuration
 
-This configuration applies to the **alpha stateless implementation**. Variables for MongoDB, MinIO, queues, IoT brokers, or workflow state are intentionally absent because those integrations are not implemented in this version.
+The FastAPI layer does not maintain a second settings object yet. It passes the
+request to the bundled collector, which reads storage and CDSE configuration
+from the process environment. Copy `.env.example` to `.env` and never commit
+the populated file.
 
-Configuration is loaded from environment variables through `src/config/env.js`.
+## Environment variables
 
-Copy `.env.example` to `.env` for local development.
+| Variable | Required | Purpose |
+| --- | --- | --- |
+| `DATA_COLLECTION_ENV_FILE` | No | Optional explicit collector environment-file path. |
+| `MONGO_URI` | Yes | Full MongoDB URI including database and, when required, `authSource`. |
+| `MINIO_ENDPOINT` | Yes | MinIO S3 API URL. Use port `9000`, not the console port `9001`. |
+| `MINIO_ACCESS_KEY` | Yes | MinIO application/root user for the current local stack. |
+| `MINIO_SECRET_KEY` | Yes | Matching MinIO secret. |
+| `MINIO_BUCKET_NAME` | Yes | Existing bucket used by the collector. |
+| `MINIO_VERIFY_TLS` | No | Enables TLS certificate verification; defaults to `true`. |
+| `MINIO_CA_BUNDLE` | No | Optional CA bundle path for private certificate authorities. |
+| `CDSE_CLIENT_ID` | Yes | Primary CDSE OAuth client ID. |
+| `CDSE_CLIENT_SECRET` | Yes | Primary CDSE OAuth client secret. |
+| `CDSE_BACKUP_CLIENT_ID`, `CDSE_BACKUP_CLIENT_SECRET` | No | First backup credential pair. |
+| `CDSE_BACKUP_2_*` through `CDSE_BACKUP_9_*` | No | Additional ordered backup pairs. |
 
-```bash
-cp .env.example .env
+The database name is taken from `MONGO_URI`; a separate `MONGO_DATABASE` value
+is not used by the collector.
+
+## Local host execution
+
+When Uvicorn runs directly on Windows and MongoDB/MinIO publish their standard
+ports to the host, endpoints may use loopback:
+
+```env
+MONGO_URI=mongodb://<user>:<url-encoded-password>@127.0.0.1:27017/terra_db?authSource=admin
+MINIO_ENDPOINT=http://127.0.0.1:9000
 ```
 
-## Environment Variables
+## Docker execution
 
-| Variable | Default | Required | Description |
-| --- | --- | --- | --- |
-| `PORT` | `3000` | No | HTTP server port. |
-| `NODE_ENV` | `development` | No | Runtime environment. Controls logging format. |
-| `REQUEST_TIMEOUT_MS` | `30000` | No | Axios request timeout in milliseconds. |
-| `MAX_CATALOGUE_LIMIT` | `100` | No | Maximum accepted catalogue limit from caller payloads. |
-| `COPERNICUS_API_MODE` | `stac` | No | Default Copernicus mode when payload does not provide `mode`. |
-| `COPERNICUS_STAC_BASE_URL` | `https://stac.dataspace.copernicus.eu/v1` | No | STAC base URL used by `mode: "stac"`. |
-| `COPERNICUS_SH_CATALOG_URL` | `https://sh.dataspace.copernicus.eu/api/v1/catalog/1.0.0/search` | Yes for `sentinel-hub-catalog` | Sentinel Hub Catalog endpoint. |
-| `COPERNICUS_SH_PROCESS_URL` | `https://sh.dataspace.copernicus.eu/api/v1/process` | Yes for `sentinel-hub-process` | Sentinel Hub Process endpoint. |
-| `COPERNICUS_ODATA_BASE_URL` | `https://catalogue.dataspace.copernicus.eu/odata/v1` | No | Reserved for future OData catalogue support. |
-| `COPERNICUS_TOKEN_URL` | CDSE OpenID Connect token endpoint | Required when using client credentials | Token endpoint used when `COPERNICUS_ACCESS_TOKEN` is not set. |
-| `COPERNICUS_USERNAME` | empty | No | Reserved for future username/password flows. |
-| `COPERNICUS_PASSWORD` | empty | No | Reserved for future username/password flows. |
-| `COPERNICUS_ACCESS_TOKEN` | empty | Required unless client credentials are provided for authenticated Sentinel Hub modes | Bearer token used directly for CDSE requests. |
-| `COPERNICUS_CLIENT_ID` | empty | Required when no access token is provided for authenticated Sentinel Hub modes | OAuth client ID. |
-| `COPERNICUS_CLIENT_SECRET` | empty | Required when no access token is provided for authenticated Sentinel Hub modes | OAuth client secret. |
+Inside a container, `localhost`, `127.0.0.1`, and `::1` identify the API
+container itself. The application Compose file attaches to the external
+`terra-network`, so use Docker DNS names and internal ports:
 
-## Authentication Behavior
-
-For `sentinel-hub-catalog` and `sentinel-hub-process`:
-
-1. If `COPERNICUS_ACCESS_TOKEN` is set, the adapter sends it as a Bearer token.
-2. If no access token is set, the adapter requests a token using `COPERNICUS_CLIENT_ID` and `COPERNICUS_CLIENT_SECRET`.
-3. Tokens are not persisted by the service.
-
-Secrets must never be committed to Git.
-
-## Docker Configuration
-
-The Docker image reads the same environment variables as local Node execution.
-
-For local Compose usage, create `.env` at the repository root:
-
-```bash
-cp .env.example .env
+```env
+MONGO_URI=mongodb://<user>:<url-encoded-password>@terra-mongodb:27017/terra_db?authSource=admin
+MINIO_ENDPOINT=http://terra-minio:9000
 ```
 
-Docker Compose loads this file automatically:
+For the provided local stack, source MongoDB and MinIO credentials from: [terra-node-stack](https://github.com/terra-horizon/terra-node-stack/blob/master/docker-files/.env_example)
+
+## Applying changes
+
+Compose injects `.env` when it creates a container. After environment-only
+changes, recreate without rebuilding:
 
 ```bash
-docker compose up --build
+docker compose up -d --force-recreate
 ```
 
-For direct `docker run`, pass the file explicitly:
+Use `--build` only after Dockerfile, dependency, or application-source changes.
 
-```bash
-docker run --rm --env-file .env -p 3000:3000 data-ingestion-module
-```
+## Security
 
-Do not bake credentials into the image. Provide `COPERNICUS_ACCESS_TOKEN`, `COPERNICUS_CLIENT_ID`, and `COPERNICUS_CLIENT_SECRET` through environment variables or the deployment platform secret manager.
+- Do not put credentials in Dockerfiles, Compose YAML, requests, logs, or Git.
+- Keep exactly one active declaration for each environment variable.
+- Use deployment-platform secrets outside local development.
+- Do not return CDSE, MongoDB, or MinIO credentials in API responses.

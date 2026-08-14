@@ -17,7 +17,7 @@ nav:
     - Configuration: configuration.md
     - Quality Assurance: qa.md
     - Pipeline Test Scenarios: pipeline-test-scenarios.md
-  - Material:
+  - Operations:
     - FAQ: faq.md
   - License: license.md
   - Home: https://terra-horizon.github.io/

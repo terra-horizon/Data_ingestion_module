@@ -1,51 +1,73 @@
 # Architecture
 
-This is the **alpha version** of the Data Ingestion Module architecture.
+## Components
 
-The service is intentionally lightweight in its current form and is designed primarily to validate external integrations, data wrapper implementations, and provider communication workflows. It is an HTTP boundary around external-provider calls and response transformation, not the complete persistence-owning ingestion subsystem.
+The service is intentionally small and separates HTTP concerns from process
+selection and collector integration.
 
-## Runtime Components
+| Layer | Location | Responsibility |
+| --- | --- | --- |
+| FastAPI application | `app/main.py` | Create the application and register API routers. |
+| HTTP route | `app/api/routes/ingestion.py` | Measure execution, map known failures to HTTP responses, and construct the response envelope. |
+| Request/response schemas | `app/schemas/ingestion.py` | Validate domain inputs and define the public API contract. |
+| Profile service | `app/services/ingestion.py` | Map a server-approved profile to its adapter and run blocking work in a thread. |
+| Collector adapter | `app/adapters/collector.py` | Translate API input into `CollectionRequest`, guard concurrent AOI execution, and normalize collector exceptions. |
+| Bundled collector | `app/packages/collector/data_collection` | Own discovery, tiling, collection state, local staging, MongoDB writes, and MinIO uploads. |
 
-The runtime is split into four small layers:
+## Request dispatch
 
-- Express layer: `app.js`, routes, controllers, and middleware expose the HTTP API and handle request/response concerns.
-- Core layer: `ingestion.service.js`, `request-normalizer.js`, `source.registry.js`, and `wrapper.registry.js` coordinate validation, provider selection, and response shaping.
-- Provider layer: source adapters, currently including `copernicus.adapter.js`, isolate external-provider communication.
-- Output layer: wrappers such as `standard-catalogue.wrapper.js`, `copernicus-compatibility.wrapper.js`, and `scene-search-compatibility.wrapper.js` transform provider responses into caller-facing contracts.
+```text
+POST /api/ingestion/run
+  -> Pydantic validation
+  -> profile registry
+  -> forecaster-collector adapter
+  -> worker thread
+  -> data_collection.collect()
+  -> collector result
+  -> FastAPI response envelope
+```
 
-Requests enter through Express routes, pass through controllers into the ingestion service, call the selected source adapter, and return through the selected wrapper before the HTTP response is sent.
+Profiles are a controlled extension point. A request selects a registered
+profile such as `forecaster-collector`; it cannot supply a module path,
+function name, or arbitrary command. A future process should add its own
+adapter and one registry entry rather than adding branches to the route.
 
-## Stateless Boundary
+## Collector persistence boundary
 
-The alpha module uses request-local variables while handling a request, but it does not persist anything after the response is returned.
+The API does not query MongoDB or MinIO after collection. Persistence is owned
+by the collector package.
 
-The service has no:
+```text
+FastAPI adapter
+  -> Collector
+       |-> CDSE STAC and Statistical APIs
+       |-> Local staging under outputs/
+       |-> MongoDB (read and write)
+       `-> MinIO   (read and write)
+```
 
-- job status map
-- queue consumer
-- database client
-- dataset repository
-- storage service
-- ingestion history table
+MongoDB stores queryable observations, tiles, collection state, and pipeline
+run records. MinIO stores the stable AOI definition, canonical JSON/GeoJSON,
+and run-scoped artifacts. Local `outputs/<run_name>` files support execution
+and resumption inside the running process, but they are not cross-service
+resource identifiers.
 
-In the alpha version, these capabilities are intentionally out of scope and are not implemented within the service.
+## State and restart behavior
 
-## Core Flow
+Deleting the local `outputs` directory does not necessarily cause a historical
+re-fetch. For a published run, the collector first hydrates observations from
+MongoDB and state/tile files from MinIO. If restored state says backfill is
+complete and `last_checked_date` already covers the target date, the discovery
+window count is zero and CDSE is not queried again.
 
-The core request flow is:
+Use a new AOI identity for an isolated fresh run, or deliberately reset both
+MongoDB and MinIO state when testing a complete replay.
 
-1. The TERRA orchestrator or caller sends `POST /api/ingestion/run` to the Express API.
-2. The API passes the payload to `runIngestion(payload)`.
-3. The ingestion service normalizes and validates the request.
-4. The selected source adapter fetches data from Copernicus/CDSE.
-5. The adapter returns raw provider data, external request metadata, and provider metadata.
-6. The selected wrapper transforms the raw data into the requested response profile.
-7. The API returns the transformed result as a stateless JSON response.
+## Current operational limits
 
-## Extension Points
-
-Add a new provider by creating a source adapter and registering it in `src/sources/source.registry.js`.
-
-Add a new response contract by creating a wrapper and registering it in `src/wrappers/wrapper.registry.js`.
-
-The ingestion service should not need provider-specific controller logic.
+- Requests wait for collection to finish; long runs are subject to client,
+  proxy, and server timeouts.
+- The in-process AOI lock applies to one API process only.
+- Multiple replicas do not share a distributed lock.
+- The Compose setup expects MongoDB and MinIO to exist on `terra-network`.
+- Authentication and authorization are not implemented yet.

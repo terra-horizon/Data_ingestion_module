@@ -1,112 +1,78 @@
 # Deployment
 
-This deployment guide applies to the **alpha stateless version** of the Data Ingestion Module.
+## Local Python process
 
-The service runs as a standard Node.js HTTP process.
+Requirements:
 
-It currently has no database, queue, or filesystem storage dependency because persistence and workflow state are outside the alpha scope.
+- Python 3.12+
+- reachable MongoDB and MinIO
+- an existing MinIO bucket
+- valid CDSE client credentials
 
-## Local Development
-
-Install dependencies:
-
-```bash
-npm install
-```
-
-Create a local environment file:
+Install and run:
 
 ```bash
-cp .env.example .env
+python -m venv .venv
+python -m pip install -e app/packages/collector
+python -m pip install -e ".[test]"
+uvicorn app.main:app --reload
 ```
 
-Start the API:
+The API listens on `127.0.0.1:8000` by default. Swagger UI is at `/docs`.
+
+## Docker image
+
+The repository Dockerfile:
+
+1. starts from `python:3.12-slim`;
+2. copies the FastAPI project and bundled collector;
+3. installs the collector from `app/packages/collector`;
+4. installs the FastAPI application;
+5. starts Uvicorn on `0.0.0.0:8000`.
+
+Build directly:
 
 ```bash
-npm run dev
+docker build -t data-ingestion-module:local .
 ```
 
-The default server URL is:
+## Docker Compose
+
+The application Compose file deploys only the API. MongoDB and MinIO remain
+owned by the separately supplied TERRA node stack.
+
+Expected resources:
 
 ```text
-http://localhost:3000
+terra-network
+  - terra-mongodb:27017
+  - terra-minio:9000
+  - data-ingestion-module:8000
 ```
 
-## Health Check
-
-Use:
-
-```bash
-curl http://localhost:3000/api/health
-```
-
-Expected response:
-
-```json
-{
-  "success": true,
-  "service": "data-ingestion-service",
-  "status": "ok",
-  "mode": "stateless"
-}
-```
-
-## Local Docker Run
-
-Build the image from the repository root:
-
-```bash
-docker build -t data-ingestion-module .
-```
-
-Run the container with environment variables from `.env`:
-
-```bash
-docker run --rm --name data-ingestion-module --env-file .env -p 3000:3000 data-ingestion-module
-```
-
-Check health:
-
-```bash
-curl http://localhost:3000/api/health
-```
-
-## Docker Compose Run
-
-Start the service:
-
-```bash
-docker compose up --build
-```
-
-Run in the background:
+Start the node stack first, then run:
 
 ```bash
 docker compose up --build -d
+docker compose ps
+docker compose logs -f data-ingestion-module
 ```
 
-Stop the service:
+Stop only the API container with:
 
 ```bash
 docker compose down
 ```
 
-The Compose file loads `.env`, maps `${PORT:-3000}`, and defines a health check against `/api/health`.
+Because `terra-network` is external, bringing down this Compose project does
+not remove MongoDB, MinIO, or their network.
 
-## Production Deployment Notes
+## Persistent data
 
-Required runtime inputs:
+MongoDB and MinIO are the durable stores. The current API Compose service does
+not mount `outputs/` as a volume, so local collector staging files disappear
+when its container is replaced. On the next run, the collector hydrates remote
+observations, collection state, and tile artifacts before calculating work.
 
-- `PORT`
-- `REQUEST_TIMEOUT_MS`
-- Copernicus endpoint URLs
-- `COPERNICUS_ACCESS_TOKEN` or `COPERNICUS_CLIENT_ID` plus `COPERNICUS_CLIENT_SECRET` for authenticated Sentinel Hub modes
-
-Operational notes:
-
-- expose the configured `PORT`
-- use `/api/health` for health checks
-- inspect logs with the container platform logs command, for example `docker logs data-ingestion-module`
-- scale horizontally by running more container instances behind a load balancer
-- keep provider credentials in platform secrets or environment variables
-- do not add database, queue, or storage containers unless the architecture changes
+The collector's CDSE discovery cache is local and is not restored from remote
+storage. It is recreated only when a discovery window actually runs.

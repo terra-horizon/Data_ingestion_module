@@ -1,261 +1,130 @@
-# Data Ingestion Service
+# TERRA Data Ingestion Module
 
-Alpha stateless HTTP Data Ingestion Module for TERRA services.
+Python 3.12+ FastAPI service that exposes the TERRA UC1 Sentinel-2 collector
+through a profile-based ingestion endpoint. The service validates orchestration
+requests, selects a registered process profile, runs the collector outside the
+async event loop, and returns run metadata with the collector result.
 
-This is an alpha version of the wider TERRA Data Ingestion Module. It focuses on validating external-provider calls, Copernicus/CDSE integration, request normalization, and response wrappers. It intentionally does not yet implement MongoDB persistence, MinIO storage, IoT ingestion, full external repository coverage, DAG progression, or orchestrator callback reporting.
+The collector is temporarily bundled at `app/packages/collector`. It remains a
+separate installable Python package and owns CDSE discovery, river tiling,
+collection state, MongoDB persistence, and MinIO publication. Replace the
+bundled copy with the organization-managed package when it becomes available.
 
-Other TERRA modules call this service instead of calling external providers directly. The module receives a request, calls the external provider, wraps or transforms the provider response, and returns the result to the caller.
-
-It does not store jobs, datasets, files, database rows, ingestion history, or workflow state. In this alpha version, an external orchestrator is responsible for job tracking, retries, persistence, pipeline progression, DB updates, and storage.
-
-## Architecture
-
-```text
-HTTP request
--> controller
--> ingestion.service.runIngestion(payload)
--> request normalizer
--> source adapter
--> wrapper
--> stateless HTTP response
-```
-
-The ingestion service does not depend on Express request/response objects. If a queue is reintroduced later, a worker can still call `runIngestion(payload)`.
-
-## Structure
+## Data flow
 
 ```text
-src/
-  app.js
-  server.js
-  config/env.js
-  routes/
-  controllers/
-  services/ingestion.service.js
-  handlers/request-normalizer.js
-  sources/
-  wrappers/
-  middleware/
-  utils/
+Caller
+  -> POST /api/ingestion/run
+  -> Pydantic request validation
+  -> profile dispatcher
+  -> forecaster-collector adapter
+  -> bundled data_collection package
+     -> restore observations/state/tiles from MongoDB and MinIO
+     -> discover new Sentinel-2 dates through CDSE when required
+     -> collect tile/date statistics
+     -> update local staging files
+     -> publish documents to MongoDB and artifacts to MinIO
+  -> structured HTTP response
 ```
 
-## Install
+The current profile is `forecaster-collector`. Profiles are server-registered;
+callers cannot provide arbitrary Python process names.
+
+## Local setup
+
+Create and activate a virtual environment:
 
 ```bash
-npm install
+python -m venv .venv
 ```
 
-## Environment
-
-```env
-PORT=3000
-NODE_ENV=development
-
-REQUEST_TIMEOUT_MS=30000
-MAX_CATALOGUE_LIMIT=100
-
-COPERNICUS_API_MODE=stac
-COPERNICUS_STAC_BASE_URL=https://stac.dataspace.copernicus.eu/v1
-COPERNICUS_SH_CATALOG_URL=https://sh.dataspace.copernicus.eu/api/v1/catalog/1.0.0/search
-COPERNICUS_SH_PROCESS_URL=https://sh.dataspace.copernicus.eu/api/v1/process
-COPERNICUS_ODATA_BASE_URL=https://catalogue.dataspace.copernicus.eu/odata/v1
-COPERNICUS_TOKEN_URL=https://identity.dataspace.copernicus.eu/auth/realms/CDSE/protocol/openid-connect/token
-
-COPERNICUS_USERNAME=
-COPERNICUS_PASSWORD=
-COPERNICUS_ACCESS_TOKEN=
-COPERNICUS_CLIENT_ID=
-COPERNICUS_CLIENT_SECRET=
-```
-
-For `sentinel-hub-catalog`, configure either `COPERNICUS_ACCESS_TOKEN` or `COPERNICUS_CLIENT_ID` plus `COPERNICUS_CLIENT_SECRET`.
-
-## Run
+Linux or macOS:
 
 ```bash
-npm run dev
+source .venv/bin/activate
 ```
+
+Windows PowerShell:
+
+```powershell
+.venv\Scripts\Activate.ps1
+```
+
+Install the bundled collector, followed by the API and test dependencies:
+
+```bash
+python -m pip install -e app/packages/collector
+python -m pip install -e ".[test]"
+```
+
+Copy `.env.example` to `.env`, supply the required credentials and storage
+endpoints, then start the API:
+
+```bash
+uvicorn app.main:app --reload
+```
+
+Swagger UI is available at <http://127.0.0.1:8000/docs>.
+
+## Run ingestion
+
+Send `POST /api/ingestion/run`:
+
+```json
+{
+  "run_job_id": "job-sperchios-20260814-001",
+  "triggered_at": "2026-08-14T07:30:00+03:00",
+  "provider": "sentinel-2",
+  "profile": "forecaster-collector",
+  "aoi_id": "sperchios",
+  "bbox": [22.433493, 38.837552, 22.569555, 38.894223],
+  "run_name": "sperchios",
+  "history_start": "2016-01-01",
+  "mode": "auto",
+  "max_days_per_run": 1,
+  "max_tiles_per_run": 1
+}
+```
+
+Use `tests_external/ingestion.http` to send the same request from an HTTP client
+that supports `.http` files.
+
+The response contains the caller's `run_job_id`, selected provider/profile,
+timings, overall status, and the serialized collector result. Paths inside
+`collector_result` refer to local staging paths in the API process or container;
+durable data is stored by the collector in MongoDB and MinIO.
 
 ## Docker
 
-Build the image from the repository root:
+The application Compose file expects the existing `terra-network`,
+`terra-mongodb`, and `terra-minio` resources supplied by the local TERRA stack.
+Use container DNS names and internal ports in `.env`:
+
+```env
+MONGO_URI=mongodb://<user>:<url-encoded-password>@terra-mongodb:27017/terra_db?authSource=admin
+MINIO_ENDPOINT=http://terra-minio:9000
+```
+
+Start or rebuild the API container:
 
 ```bash
-docker build -t data-ingestion-module .
+docker compose up --build -d
 ```
 
-Run it with local environment variables:
+The API is exposed at <http://127.0.0.1:8000>. MinIO port `9000` is the S3 API;
+port `9001` is the browser console.
+
+## Tests
 
 ```bash
-docker run --rm --name data-ingestion-module --env-file .env -p 3000:3000 data-ingestion-module
+python -m pytest
 ```
 
-Or use Docker Compose:
+The tests use an in-process ASGI client and mock collector execution. They do
+not contact CDSE, MongoDB, or MinIO.
 
-```bash
-docker compose up --build
-```
+## Documentation
 
-Stop Compose:
-
-```bash
-docker compose down
-```
-
-The container exposes `/api/health` and does not include a database, queue, or storage service.
-
-## Endpoints
-
-- `GET /api/health`
-- `GET /api/sources`
-- `GET /api/sources/:source/health`
-- `POST /api/ingestion/run`
-
-Health response:
-
-```json
-{
-  "success": true,
-  "service": "data-ingestion-service",
-  "status": "ok",
-  "mode": "stateless"
-}
-```
-
-## Scene Search Compatibility
-
-Use this profile when replacing the direct Python `_search_scenes_cdse(...)` call.
-
-```bash
-curl -X POST http://localhost:3000/api/ingestion/run \
-  -H "Content-Type: application/json" \
-  -d '{
-    "source": "copernicus",
-    "mode": "sentinel-hub-catalog",
-    "collection": "sentinel-2-l2a",
-    "datasetType": "catalogue",
-    "format": "json",
-    "responseProfile": "scene-search-compatibility",
-    "requestParams": {
-      "bbox": [22.1, 39.4, 22.8, 40.1],
-      "dateFrom": "2025-01-01",
-      "dateTo": "2025-01-31",
-      "maxImages": 5,
-      "maxCloudPct": 20,
-      "cloudCoverageMax": 20
-    },
-    "download": false
-  }'
-```
-
-Response shape:
-
-```json
-{
-  "success": true,
-  "source": "copernicus",
-  "mode": "sentinel-hub-catalog",
-  "collection": "sentinel-2-l2a",
-  "responseProfile": "scene-search-compatibility",
-  "data": [
-    {
-      "scene_id": "S2C_MSIL2A_...",
-      "datetime": "2025-01-27T09:29:53.031Z",
-      "cloud_pct": 11.75,
-      "collection": "sentinel-2-l2a",
-      "bbox": [],
-      "properties": {
-        "platform": "sentinel-2c",
-        "constellation": "sentinel-2"
-      }
-    }
-  ],
-  "metadata": {
-    "type": "scene-search-results",
-    "count": 1,
-    "provider": "copernicus",
-    "mode": "sentinel-hub-catalog",
-    "collection": "sentinel-2-l2a",
-    "queriedAt": "..."
-  }
-}
-```
-
-## Standard Catalogue Profile
-
-Use `responseProfile: "standard"` for the internal T-compatible catalogue object.
-
-## Copernicus Compatibility Profile
-
-Use `responseProfile: "copernicus-compatibility"` for a simpler product list that is easier for teams migrating away from direct Copernicus calls.
-
-## Direct Vs Ingestion Comparison
-
-Start the Node service:
-
-```bash
-npm run dev
-```
-
-Then run:
-
-```bash
-python tests_external/compare_scene_search.py
-```
-
-The script:
-
-- calls CDSE directly
-- calls this ingestion service
-- prints both outputs
-- compares scene IDs
-- checks order
-- checks full output equality
-
-Expected comparison:
-
-```json
-{
-  "only_direct": [],
-  "only_ingestion": [],
-  "same_order": true,
-  "same_full_output": true
-}
-```
-
-## Direct Vs Ingestion Download Comparison
-
-The download harness mirrors `_download_scene_cdse(...)`.
-
-The Node service stays stateless: it calls CDSE Process API and returns the TIFF bytes as base64. The Python replacement writes those bytes to the requested local path, matching the original function contract.
-
-Run the Node service:
-
-```bash
-npm run dev
-```
-
-Then run:
-
-```bash
-python tests_external/compare_scene_download.py
-```
-
-The script writes:
-
-```text
-tests_external/output/direct_scene.tif
-tests_external/output/ingestion_scene.tif
-```
-
-and compares file size plus SHA-256. The output folder is ignored by Git.
-
-## Add A Source
-
-Add a source adapter under `src/sources`, then register it in `source.registry.js`.
-
-## Add A Wrapper
-
-Add a wrapper under `src/wrappers`, then register it in `wrapper.registry.js`.
-
-Wrappers select output shape using `datasetType`, `format`, `source`, and `responseProfile`.
+Detailed architecture, API, configuration, deployment, workflow, and QA guides
+are under `docs/docs`. Build them from `docs/` with MkDocs when the documentation
+tooling is installed.

@@ -1,102 +1,74 @@
 # Quality Assurance
 
-QA for this alpha version focuses on HTTP availability, request normalization, Copernicus/CDSE connectivity, wrappers, and direct-vs-ingestion compatibility.
+## Automated API tests
 
-## What To Verify Before Handoff
-
-Run the API locally:
+Run from the repository root:
 
 ```bash
-npm run dev
+python -m pytest
 ```
 
-Then verify:
+The FastAPI tests use `httpx.ASGITransport` and mock the collector boundary.
+They verify:
+
+- HTTP `200` success responses;
+- `partial` collector results;
+- orchestration metadata and selected profile;
+- construction of the collector request;
+- timezone, AOI, bounding-box, and profile validation;
+- stable, sanitized HTTP `500` behavior for unexpected collector errors.
+
+These tests do not contact CDSE, MongoDB, or MinIO.
+
+## Bundled collector tests
+
+The collector has its own test suite and optional test dependencies:
 
 ```bash
-curl http://localhost:3000/api/health
-curl http://localhost:3000/api/sources
+python -m pip install -e "app/packages/collector[test]"
+python -m pytest app/packages/collector/tests
 ```
 
-For Copernicus compatibility work, run:
+Collector tests cover incremental state, discovery caching, retries, storage
+contracts, publication, and schema validation without live CDSE calls.
 
-```bash
-python tests_external/compare_scene_search.py
-python tests_external/compare_scene_download.py
+## Manual API test
+
+Start Uvicorn or the Compose service and execute
+`tests_external/ingestion.http`. For a commissioning run, retain small limits:
+
+```json
+{
+  "max_days_per_run": 1,
+  "max_tiles_per_run": 1
+}
 ```
 
-The scene search comparison should show no missing items and the same ordering.
+Confirm:
 
-## Troubleshooting
+1. HTTP status is `200` for `success` or `partial`.
+2. The response echoes `run_job_id`, provider, profile, and AOI.
+3. MongoDB `pipeline_runs` contains the collector run.
+4. Observation/tile/state documents are present under the expected AOI.
+5. MinIO contains stable AOI artifacts and a run-scoped prefix.
 
-### `COPERNICUS_AUTH_MISSING`
+## Failure-path checks
 
-The Sentinel Hub Catalog or Process mode needs credentials.
+| Test | Expected result |
+| --- | --- |
+| Missing or unknown profile | HTTP `422`. |
+| Timestamp without timezone | HTTP `422`. |
+| Reversed or incomplete bbox | HTTP `422`. |
+| Missing collector environment variable | HTTP `400`. |
+| MongoDB/MinIO unreachable | HTTP `503`. |
+| Concurrent request for same AOI in one API process | HTTP `409`. |
+| Unexpected collector exception | HTTP `500` without a traceback in the response. |
 
-Set either:
+Use container logs and the collector's `pipeline_runs` records for internal
+diagnostics. Public errors intentionally avoid returning tracebacks.
 
-```env
-COPERNICUS_ACCESS_TOKEN=...
-```
+## Documentation checks
 
-or:
-
-```env
-COPERNICUS_CLIENT_ID=...
-COPERNICUS_CLIENT_SECRET=...
-```
-
-### `COPERNICUS_AUTH_ERROR`
-
-The service tried to acquire a token but CDSE rejected the request.
-
-Check:
-
-- client ID
-- client secret
-- token URL
-- account permissions
-
-### `EXTERNAL_API_ERROR`
-
-The external provider returned a non-success response.
-
-The error message includes provider status and a short response detail. It should not include secrets.
-
-### `EXTERNAL_API_TIMEOUT`
-
-The provider request exceeded `REQUEST_TIMEOUT_MS`.
-
-Increase the timeout for large Process API calls:
-
-```env
-REQUEST_TIMEOUT_MS=180000
-```
-
-### `ROUTE_NOT_FOUND` for `/api/ingestion/run`
-
-The route only supports `POST`.
-
-Use:
-
-```bash
-curl -X POST http://localhost:3000/api/ingestion/run
-```
-
-### Scene Search Results Differ
-
-Check that both direct and ingestion paths use the same:
-
-- bbox
-- date range
-- maximum cloud percentage
-- maximum images
-- credentials
-- CDSE catalog endpoint
-
-The compatibility wrapper filters cloud coverage and sorts by datetime descending to match the original Python implementation.
-
-### Download Comparison Differs
-
-Check that both paths use the same scene datetime and bbox. The Process API request depends on the time window and calculated output dimensions.
-
-Also confirm the caller writes the ingestion response bytes exactly after base64 decoding.
+Generated `docs/site` content must not be edited or committed. Build from the
+Markdown sources under `docs/docs` when MkDocs and the configured plugins are
+installed.

@@ -1,220 +1,111 @@
 # API Reference
 
-This API reference describes the **alpha stateless API**. It does not expose job, storage, database, or workflow-management endpoints yet.
-
-Base URL for local development:
+Local base URL:
 
 ```text
-http://localhost:3000
+http://127.0.0.1:8000
 ```
 
-## GET /api/health
-
-Returns basic service status.
-
-```bash
-curl http://localhost:3000/api/health
-```
-
-Response:
-
-```json
-{
-  "success": true,
-  "service": "data-ingestion-service",
-  "status": "ok",
-  "mode": "stateless"
-}
-```
-
-## GET /api/sources
-
-Lists registered source adapters.
-
-```bash
-curl http://localhost:3000/api/sources
-```
-
-Response:
-
-```json
-{
-  "success": true,
-  "sources": [
-    {
-      "name": "copernicus",
-      "adapter": "CopernicusAdapter"
-    }
-  ]
-}
-```
-
-## GET /api/sources/:source/health
-
-Calls the selected source adapter health check.
-
-```bash
-curl http://localhost:3000/api/sources/copernicus/health
-```
-
-The exact health payload depends on the adapter.
+Interactive OpenAPI documentation is available at `/docs`.
 
 ## POST /api/ingestion/run
 
-Executes one stateless ingestion call.
+Runs the process selected by `profile`. The current implementation supports
+only `forecaster-collector` with provider `sentinel-2`.
 
-In the alpha version, this endpoint returns transformed data directly. It does not return MongoDB entry IDs, MinIO paths, job IDs, or persistent storage locations.
-
-The response shape is:
+### Request
 
 ```json
 {
-  "success": true,
-  "source": "copernicus",
-  "mode": "sentinel-hub-catalog",
-  "collection": "sentinel-2-l2a",
-  "responseProfile": "scene-search-compatibility",
-  "data": [],
-  "metadata": {}
+  "run_job_id": "job-sperchios-20260814-001",
+  "triggered_at": "2026-08-14T07:30:00+03:00",
+  "provider": "sentinel-2",
+  "profile": "forecaster-collector",
+  "aoi_id": "sperchios",
+  "bbox": [22.433493, 38.837552, 22.569555, 38.894223],
+  "run_name": "sperchios",
+  "history_start": "2016-01-01",
+  "target_date": "2026-08-14",
+  "mode": "auto",
+  "max_days_per_run": 1,
+  "max_tiles_per_run": 1
 }
 ```
 
-### Standard STAC Catalogue
+| Field | Required | Description |
+| --- | --- | --- |
+| `run_job_id` | Yes | Caller-owned orchestration identifier echoed in responses and handled errors. |
+| `triggered_at` | Yes | ISO 8601 timestamp including a timezone offset. |
+| `provider` | Yes | Currently `sentinel-2`. |
+| `profile` | Yes | Currently `forecaster-collector`. |
+| `aoi_id` | Yes | Stable remote-storage identity for the physical AOI. |
+| `bbox` | Yes | `[min_lon, min_lat, max_lon, max_lat]` in WGS84. |
+| `run_name` | Yes | Name used for the normalized local output directory. |
+| `history_start` | No | Historical discovery start date; default `2016-01-01`. |
+| `target_date` | No | Inclusive end date; defaults to the current UTC date in the adapter. |
+| `mode` | No | `auto`, `backfill`, or `incremental`; default `auto`. |
+| `max_days_per_run` | No | Positive limit for missing dates processed in this invocation. |
+| `max_tiles_per_run` | No | Positive limit for tiles processed in this invocation. |
 
-Use `responseProfile: "standard"` for the platform catalogue object.
+### Successful response
 
-```bash
-curl -X POST http://localhost:3000/api/ingestion/run \
-  -H "Content-Type: application/json" \
-  -d '{
-    "source": "copernicus",
-    "mode": "stac",
-    "collection": "sentinel-2-l2a",
-    "datasetType": "catalogue",
-    "format": "json",
-    "responseProfile": "standard",
-    "requestParams": {
-      "bbox": [22.1, 39.4, 22.8, 40.1],
-      "dateFrom": "2025-01-01",
-      "dateTo": "2025-01-31",
-      "limit": 5,
-      "cloudCoverageMax": 20
-    },
-    "download": false
-  }'
-```
-
-### Scene Search Compatibility
-
-Use this profile to replace the existing Python `_search_scenes_cdse(...)` function.
-
-```bash
-curl -X POST http://localhost:3000/api/ingestion/run \
-  -H "Content-Type: application/json" \
-  -d '{
-    "source": "copernicus",
-    "mode": "sentinel-hub-catalog",
-    "collection": "sentinel-2-l2a",
-    "datasetType": "catalogue",
-    "format": "json",
-    "responseProfile": "scene-search-compatibility",
-    "requestParams": {
-      "bbox": [22.1, 39.4, 22.8, 40.1],
-      "dateFrom": "2025-01-01",
-      "dateTo": "2025-01-31",
-      "maxImages": 5,
-      "maxCloudPct": 20,
-      "cloudCoverageMax": 20
-    },
-    "download": false
-  }'
-```
-
-The `data` field is a list matching the old function contract:
+Both complete and partial collector outcomes return HTTP `200`.
 
 ```json
-[
-  {
-    "scene_id": "S2C_MSIL2A_...",
-    "datetime": "2025-01-27T09:29:53.031Z",
-    "cloud_pct": 11.75,
-    "collection": "sentinel-2-l2a",
-    "bbox": [22.1, 39.4, 22.8, 40.1],
-    "properties": {
-      "platform": "sentinel-2c",
-      "constellation": "sentinel-2"
-    }
+{
+  "run_job_id": "job-sperchios-20260814-001",
+  "provider": "sentinel-2",
+  "profile": "forecaster-collector",
+  "aoi_id": "sperchios",
+  "triggered_at": "2026-08-14T07:30:00+03:00",
+  "started_at": "2026-08-14T04:30:01Z",
+  "completed_at": "2026-08-14T04:30:04Z",
+  "duration_ms": 3000,
+  "status": "success",
+  "collector_result": {
+    "status": "success",
+    "run_dir": "outputs/sperchios",
+    "run_summary": "No new satellite data required collection.",
+    "mode": "auto",
+    "available_dates": [],
+    "missing_dates": [],
+    "collected_dates": [],
+    "new_record_count": 0,
+    "failed_units": [],
+    "latest_available_observation": null,
+    "history_json_path": "outputs/sperchios/history/global_history.json",
+    "history_csv_path": "outputs/sperchios/history/global_history.csv",
+    "tile_records_path": "outputs/sperchios/tiles/tile_records.json",
+    "tiles_geojson_path": "outputs/sperchios/tiles/river_tiles.geojson",
+    "state_path": "outputs/sperchios/collection/state.json",
+    "discovery_windows": [],
+    "warnings": []
   }
-]
-```
-
-### Scene Download Compatibility
-
-Use this profile to replace the existing Python `_download_scene_cdse(...)` call.
-
-The Node service remains stateless. It calls CDSE Process API and returns TIFF bytes as base64. The caller writes the file to its own target path.
-
-```bash
-curl -X POST http://localhost:3000/api/ingestion/run \
-  -H "Content-Type: application/json" \
-  -d '{
-    "source": "copernicus",
-    "mode": "sentinel-hub-process",
-    "collection": "sentinel-2-l2a",
-    "datasetType": "image",
-    "format": "tiff",
-    "responseProfile": "scene-download-compatibility",
-    "requestParams": {
-      "bbox": [22.1, 39.4, 22.8, 40.1],
-      "scene": {
-        "scene_id": "S2C_MSIL2A_...",
-        "datetime": "2025-01-27T09:29:53.031Z"
-      }
-    },
-    "download": true
-  }'
-```
-
-Response `data` contains:
-
-```json
-{
-  "scene_id": "S2C_MSIL2A_...",
-  "datetime": "2025-01-27T09:29:53.031Z",
-  "contentType": "image/tiff",
-  "format": "tiff",
-  "dataBase64": "...",
-  "sizeBytes": 123456,
-  "width": 512,
-  "height": 512,
-  "bbox": [22.1, 39.4, 22.8, 40.1]
 }
 ```
 
-## Error Response
+The exact `collector_result` follows the bundled collector's
+`CollectionResult.to_dict()` contract. Local paths are execution details, not
+portable MongoDB or MinIO references.
 
-All handled errors use:
+### Handled errors
 
 ```json
 {
-  "success": false,
-  "message": "error",
-  "code": "ERROR_CODE"
+  "detail": {
+    "code": "collector_unavailable",
+    "message": "MinIO preflight failed ...",
+    "run_job_id": "job-sperchios-20260814-001"
+  }
 }
 ```
 
-Common error codes:
+| Status | Code | Meaning |
+| --- | --- | --- |
+| `400` | `collector_configuration_error` | Collector input or runtime configuration is invalid. |
+| `409` | `collector_already_running` | The same API process is already collecting this AOI. |
+| `503` | `collector_unavailable` | MongoDB or MinIO preflight failed. |
+| `500` | `collector_execution_error` | An unexpected collector failure was hidden behind a stable public message. |
+| `422` | FastAPI validation detail | Request fields failed schema validation. |
 
-| Code | Meaning |
-| --- | --- |
-| `VALIDATION_ERROR` | Request payload failed validation. |
-| `INVALID_REQUEST` | The requested provider operation is not valid. |
-| `UNKNOWN_SOURCE` | No adapter is registered for the requested source. |
-| `UNSUPPORTED_MODE` | The adapter does not support the requested mode. |
-| `DOWNLOAD_NOT_SUPPORTED` | Download was requested for a mode that does not support it. |
-| `COPERNICUS_AUTH_MISSING` | CDSE credentials or token are missing. |
-| `COPERNICUS_AUTH_ERROR` | Token acquisition failed. |
-| `EXTERNAL_API_ERROR` | External provider returned an error response. |
-| `EXTERNAL_API_TIMEOUT` | External request timed out. |
-| `UNSUPPORTED_WRAPPER` | No wrapper supports the requested response profile. |
-| `ROUTE_NOT_FOUND` | No matching route exists. |
+The service currently exposes no `/api/health` or `/api/sources` endpoints.

@@ -1,23 +1,35 @@
 # FAQ
 
-## Why do wrappers exist?
+## What does `profile` select?
 
-Wrappers define the response contract returned to calling modules.
+It selects a server-registered process adapter. The only current value is
+`forecaster-collector`, which invokes the bundled Sentinel-2 collector.
+Arbitrary commands and module names are not accepted.
 
-Use `standard` for platform-friendly catalogue results. Use compatibility profiles when another team already expects a specific shape from an older direct-provider function.
+## How do I add another process?
 
-## Can the service support another provider?
+Create an adapter with a request-to-process translation, register it in
+`PROFILE_RUNNERS` in `app/services/ingestion.py`, and extend the request profile
+type and tests. Keep process-specific branching out of the HTTP route.
 
-Yes, the architecture is designed to scale. You can add a new provider by creating a dedicated source adapter and registering it within `source.registry.js`.
+## Why is the collector inside `app/packages/collector`?
 
-## Can the service support another response shape?
+It is a temporary vendored dependency while we establishe an
+installable organizational package. Docker and local setup install it through
+its own `pyproject.toml`; FastAPI does not import it as `app.packages`.
 
-Yes, it is fully flexible. Supporting a new response shape simply requires implementing a new wrapper and registering it in `wrapper.registry.js`.
+## Does deleting `outputs/` force a complete replay?
 
-## How can the service be scaled?
+No. Published collector state is restored from MongoDB and MinIO. If that state
+says the historical backfill is complete, the collector requests only new or
+incomplete work. Use a new AOI identity or deliberately reset both durable
+stores for a genuinely fresh test.
 
-Run multiple container instances behind a load balancer. The service does not keep per-instance job state, so horizontal scaling is safe as long as provider credentials and external API rate limits are handled.
+## Does the endpoint run in the background?
 
-## How are provider credentials handled?
+No. It waits for the selected profile to finish. The blocking collector runs in
+a worker thread, but the HTTP request remains open.
 
-The service reads credentials from environment variables. It does not hardcode secrets and does not persist tokens beyond normal process memory.
+## Is authentication implemented?
+
+No. The current API has no caller authentication or authorization layer.

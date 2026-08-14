@@ -1,159 +1,94 @@
 # Pipeline Test Scenarios
 
-These scenarios verify the **alpha service** as a stateless replacement for direct external calls.
+These scenarios exercise the implemented FastAPI-to-collector flow. Use a test
+AOI and local MongoDB/MinIO data that can be reset safely.
 
-They do not validate MongoDB persistence, MinIO storage, orchestrator callbacks, or IoT ingestion because those features are outside the current alpha implementation.
+## Scenario 1: Request validation
 
-## Prerequisites
+Remove `profile`, provide an unknown profile, remove the timezone from
+`triggered_at`, or reverse bbox coordinates.
 
-Install Node dependencies:
+Expected result: HTTP `422`; the collector is not called.
 
-```bash
-npm install
-```
+## Scenario 2: First bounded backfill
 
-Configure `.env` with either:
-
-```env
-COPERNICUS_ACCESS_TOKEN=...
-```
-
-or:
-
-```env
-COPERNICUS_CLIENT_ID=...
-COPERNICUS_CLIENT_SECRET=...
-```
-
-Start the service:
-
-```bash
-npm run dev
-```
-
-## Scenario 1: Health Check
-
-```bash
-curl http://localhost:3000/api/health
-```
-
-Expected:
+Use a new `aoi_id` and `run_name` with:
 
 ```json
 {
-  "success": true,
-  "service": "data-ingestion-service",
-  "status": "ok",
-  "mode": "stateless"
+  "mode": "auto",
+  "max_days_per_run": 1,
+  "max_tiles_per_run": 1
 }
 ```
 
-## Scenario 2: Registered Sources
+Expected result:
 
-```bash
-curl http://localhost:3000/api/sources
-```
+- CDSE discovery windows are requested and written under
+  `outputs/<run>/cdse_stac_cache`;
+- river tiles are generated;
+- at most one date and one tile are processed;
+- MongoDB and MinIO receive collector-owned data;
+- HTTP status is `200` with collector status `success` or `partial`.
 
-Expected source list includes `copernicus`.
+## Scenario 3: Incremental rerun
 
-## Scenario 3: Direct Vs Ingestion Scene Search
+Repeat the same AOI after a successful run.
 
-Run:
+Expected result:
 
-```bash
-python tests_external/compare_scene_search.py
-```
+- remote state and observations are restored if local staging is absent;
+- completed tile/date units are not duplicated;
+- only newly available or incomplete work is selected.
 
-The script:
+## Scenario 4: Local output deletion
 
-- calls CDSE directly
-- calls the ingestion service
-- prints both outputs
-- compares scene IDs
-- compares ordering
-- compares full output equality
+Delete only the test run's local `outputs/<run>` directory and rerun the same
+AOI.
 
-Expected comparison:
+Expected result: MongoDB/MinIO state is hydrated. Historical CDSE requests are
+not repeated when restored state already covers the target date. The local STAC
+cache may remain absent when discovery window count is zero.
 
-```json
-{
-  "only_direct": [],
-  "only_ingestion": [],
-  "same_order": true,
-  "same_full_output": true
-}
-```
+## Scenario 5: Partial run
 
-## Scenario 4: Direct Vs Ingestion Scene Download
+Cause one collector unit to fail transiently while another succeeds.
 
-Run:
+Expected result: HTTP `200`, response status `partial`, successful data remains
+published, and retryable units appear in `failed_units`.
 
-```bash
-python tests_external/compare_scene_download.py
-```
+## Scenario 6: MongoDB connectivity and authentication
 
-The script:
+Test an unreachable hostname, then a URI without credentials against an
+authenticated MongoDB.
 
-- searches for a scene
-- downloads the TIFF directly from CDSE
-- downloads the TIFF through the ingestion service
-- writes both files under `tests_external/output`
-- compares byte size and SHA-256
+Expected result: unreachable storage maps to HTTP `503`. An authorization error
+during later MongoDB setup may surface as the collector's generic HTTP `500`;
+inspect container logs and `pipeline_runs` during diagnosis.
 
-Expected:
+## Scenario 7: MinIO connectivity
 
-- matching file size
-- matching SHA-256
+Set `MINIO_ENDPOINT` to `localhost` inside the API container.
 
-The Node service does not store either file.
+Expected result: HTTP `503`. Restore `http://terra-minio:9000`, recreate the API
+container, and confirm the bucket and credentials match the node stack.
 
-## Scenario 5: Validation Failure
+## Scenario 8: Same-AOI concurrency
 
-Send an invalid bounding box:
+Send two overlapping requests for the same AOI to one API process.
 
-```bash
-curl -X POST http://localhost:3000/api/ingestion/run \
-  -H "Content-Type: application/json" \
-  -d '{
-    "source": "copernicus",
-    "requestParams": {
-      "bbox": [22.1, 39.4]
-    }
-  }'
-```
+Expected result: one request runs and the other returns HTTP `409`.
 
-Expected:
+## Scenario 9: Independent AOIs
 
-```json
-{
-  "success": false,
-  "message": "bbox must contain exactly four numbers",
-  "code": "VALIDATION_ERROR"
-}
-```
+Send requests for two different AOI IDs.
 
-## Scenario 6: Missing Credentials
+Expected result: the process-local guard allows both. Resource capacity and
+external API limits still apply.
 
-Run a Sentinel Hub Catalog request without `COPERNICUS_ACCESS_TOKEN` or client credentials.
+## Scenario 10: Container replacement
 
-Expected error code:
+Run successfully, recreate the API container, and run the same AOI again.
 
-```text
-COPERNICUS_AUTH_MISSING
-```
-
-## Scenario 7: Timeout Behavior
-
-Set a very low timeout:
-
-```env
-REQUEST_TIMEOUT_MS=1
-```
-
-Then run a provider request.
-
-Expected error code:
-
-```text
-EXTERNAL_API_TIMEOUT
-```
+Expected result: local staging starts empty, durable collector state is
+restored, and only required incremental work runs.
