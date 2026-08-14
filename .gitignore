@@ -3,5 +3,15 @@ node_modules/
 .env
 npm-debug.log*
 __pycache__/
+*.py[cod]
+.pytest_cache/
+.venv/
+.uv-cache/
+.uv-python/
+*.egg-info/
+build/
+dist/
 tests_external/output/
 docs/site/
+outputs/
+cache/
