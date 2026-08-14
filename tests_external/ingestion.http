@@ -1,0 +1,25 @@
+@baseUrl = http://127.0.0.1:8000
+
+### Run Sentinel-2 ingestion for Sperchios
+POST {{baseUrl}}/api/ingestion/run
+Content-Type: application/json
+Accept: application/json
+
+{
+  "run_job_id": "job-sperchios-20260811-001",
+  "triggered_at": "2026-08-11T10:00:00Z",
+  "provider": "sentinel-2",
+  "profile": "forecaster-collector",
+  "aoi_id": "sperchios",
+  "bbox": [
+    22.433493,
+    38.837552,
+    22.569555,
+    38.894223
+  ],
+  "run_name": "sperchios",
+  "history_start": "2016-01-01",
+  "mode": "auto",
+  "max_days_per_run": 1,
+  "max_tiles_per_run": 1
+}
