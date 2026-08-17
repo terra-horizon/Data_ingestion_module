@@ -66,9 +66,3 @@ Confirm:
 
 Use container logs and the collector's `pipeline_runs` records for internal
 diagnostics. Public errors intentionally avoid returning tracebacks.
-
-## Documentation checks
-
-Generated `docs/site` content must not be edited or committed. Build from the
-Markdown sources under `docs/docs` when MkDocs and the configured plugins are
-installed.

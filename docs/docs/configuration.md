@@ -58,10 +58,3 @@ docker compose up -d --force-recreate
 ```
 
 Use `--build` only after Dockerfile, dependency, or application-source changes.
-
-## Security
-
-- Do not put credentials in Dockerfiles, Compose YAML, requests, logs, or Git.
-- Keep exactly one active declaration for each environment variable.
-- Use deployment-platform secrets outside local development.
-- Do not return CDSE, MongoDB, or MinIO credentials in API responses.
