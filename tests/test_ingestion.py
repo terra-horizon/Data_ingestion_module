@@ -43,7 +43,8 @@ async def test_run_ingestion_returns_success(monkeypatch, client: httpx.AsyncCli
     collector = Mock(return_value=collector_result)
     monkeypatch.setattr("app.adapters.collector.collect", collector)
 
-    response = await client.post("/api/ingestion/run", json=VALID_REQUEST)
+    request_body = {**VALID_REQUEST, "history_start": "2026-07-01"}
+    response = await client.post("/api/ingestion/run", json=request_body)
 
     assert response.status_code == 200
     body = response.json()
@@ -61,6 +62,7 @@ async def test_run_ingestion_returns_success(monkeypatch, client: httpx.AsyncCli
     collection_request = collector.call_args.args[0]
     assert collection_request.aoi_id == "sperchios"
     assert collection_request.aoi_bbox == VALID_REQUEST["bbox"]
+    assert collection_request.history_start == "2026-07-01"
     assert collection_request.publish is True
 
 
