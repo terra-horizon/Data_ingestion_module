@@ -23,3 +23,97 @@ Accept: application/json
   "max_days_per_run": 1,
   "max_tiles_per_run": 1
 }
+
+### Process one queued date across all remaining tiles
+POST {{baseUrl}}/api/ingestion/run
+Content-Type: application/json
+Accept: application/json
+
+{
+  "run_job_id": "job-sperchios-20260826-all-tiles",
+  "triggered_at": "2026-08-26T12:00:00+03:00",
+  "provider": "sentinel-2",
+  "profile": "forecaster-collector",
+  "aoi_id": "sperchios",
+  "bbox": [
+    22.433493,
+    38.837552,
+    22.569555,
+    38.894223
+  ],
+  "run_name": "sperchios",
+  "history_start": "2016-01-01",
+  "target_date": "2026-08-26",
+  "mode": "auto",
+  "max_days_per_run": 1
+}
+
+### Run unrestricted ingestion for Sperchios v7
+POST {{baseUrl}}/api/ingestion/run
+Content-Type: application/json
+Accept: application/json
+
+{
+  "run_job_id": "job-sperchios-v7-20260826",
+  "triggered_at": "2026-08-26T12:00:00+03:00",
+  "provider": "sentinel-2",
+  "profile": "forecaster-collector",
+  "aoi_id": "sperchios_v7",
+  "bbox": [
+    22.433493,
+    38.837552,
+    22.569555,
+    38.894223
+  ],
+  "run_name": "sperchios_v7",
+  "history_start": "2026-07-01",
+  "mode": "auto"
+}
+
+### Run a fresh single-day, single-tile ingestion for Sperchios v4
+POST {{baseUrl}}/api/ingestion/run
+Content-Type: application/json
+Accept: application/json
+
+{
+  "run_job_id": "job-sperchios-v4-20260826",
+  "triggered_at": "2026-08-26T12:00:00+03:00",
+  "provider": "sentinel-2",
+  "profile": "forecaster-collector",
+  "aoi_id": "sperchios_v5",
+  "bbox": [
+    22.433493,
+    38.837552,
+    22.569555,
+    38.894223
+  ],
+  "run_name": "sperchios_v5",
+  "history_start": "2026-07-01",
+  "mode": "auto",
+  "max_days_per_run": 1,
+  "max_tiles_per_run": 1
+}
+
+### Process one queued date across all remaining tiles
+
+POST {{baseUrl}}/api/ingestion/run
+Content-Type: application/json
+Accept: application/json
+
+{
+  "run_job_id": "job-sperchios-20260827",
+  "triggered_at": "2026-08-27T09:00:00+03:00",
+  "provider": "sentinel-2",
+  "profile": "forecaster-collector",
+  "aoi_id": "sperchios_v3",
+  "bbox": [
+    22.433493,
+    38.837552,
+    22.569555,
+    38.894223
+  ],
+  "run_name": "sperchios_v3",
+  "history_start": "2026-08-01",
+  "mode": "auto",
+  "max_days_per_run": 1
+}
