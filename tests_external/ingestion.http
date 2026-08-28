@@ -55,18 +55,18 @@ Accept: application/json
 
 {
   "run_job_id": "job-sperchios-v7-20260826",
-  "triggered_at": "2026-08-26T12:00:00+03:00",
+  "triggered_at": "2026-08-27T09:00:00+03:00",
   "provider": "sentinel-2",
   "profile": "forecaster-collector",
-  "aoi_id": "sperchios_v7",
+  "aoi_id": "sperchios_e2e_v1",
   "bbox": [
     22.433493,
     38.837552,
     22.569555,
     38.894223
   ],
-  "run_name": "sperchios_v7",
-  "history_start": "2026-07-01",
+  "run_name": "sperchios_e2e_v1",
+  "history_start": "2026-01-01",
   "mode": "auto"
 }
 
