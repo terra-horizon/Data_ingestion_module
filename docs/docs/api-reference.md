@@ -8,6 +8,39 @@ http://127.0.0.1:8000
 
 Interactive OpenAPI documentation is available at `/docs`.
 
+## GET /health/live
+
+Returns HTTP `200` when the FastAPI process is running:
+
+```json
+{
+  "status": "ok"
+}
+```
+
+This endpoint does not contact external dependencies.
+
+## GET /health/ready
+
+Checks required storage configuration, MongoDB connectivity, and access to the
+configured MinIO bucket. It performs no writes. A ready service returns HTTP
+`200`:
+
+```json
+{
+  "status": "ready",
+  "checks": {
+    "configuration": "ok",
+    "mongodb": "ok",
+    "minio": "ok"
+  }
+}
+```
+
+An unavailable dependency returns HTTP `503`. The response identifies only the
+failed dependency and does not expose connection strings, credentials, or
+internal exception details.
+
 ## POST /api/ingestion/run
 
 Runs the process selected by `profile`. The current implementation supports
@@ -108,4 +141,4 @@ portable MongoDB or MinIO references.
 | `500` | `collector_execution_error` | An unexpected collector failure was hidden behind a stable public message. |
 | `422` | FastAPI validation detail | Request fields failed schema validation. |
 
-The service currently exposes no `/api/health` or `/api/sources` endpoints.
+The service currently exposes no `/api/sources` endpoint.

@@ -11,6 +11,8 @@ python -m pytest
 The FastAPI tests use `httpx.ASGITransport` and mock the collector boundary.
 They verify:
 
+- liveness and readiness response contracts;
+- sanitized HTTP `503` readiness responses;
 - HTTP `200` success responses;
 - `partial` collector results;
 - orchestration metadata and selected profile;

@@ -1,0 +1,9 @@
+@baseUrl = http://127.0.0.1:8000
+
+### Liveness: confirms that the FastAPI process is running
+GET {{baseUrl}}/health/live
+Accept: application/json
+
+### Readiness: validates configuration, MongoDB, and MinIO connectivity
+GET {{baseUrl}}/health/ready
+Accept: application/json
