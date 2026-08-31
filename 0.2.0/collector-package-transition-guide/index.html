@@ -11,6 +11,10 @@
         <link rel="canonical" href="https://terra-horizon.github.io/Data_ingestion_module/0.2.0/collector-package-transition-guide/">
       
       
+        <link rel="prev" href="../workflow/">
+      
+      
+        <link rel="next" href="../deployment/">
       
       
         
@@ -21,7 +25,7 @@
     
     
       
-        <title>Transitioning Team Collection Logic into Independent Collector Packages - TERRA Data Ingestion Module Docs</title>
+        <title>Collector Package Transition - TERRA Data Ingestion Module Docs</title>
       
     
     
@@ -123,7 +127,7 @@
         <div class="md-header__topic" data-md-component="header-topic">
           <span class="md-ellipsis">
             
-              Transitioning Team Collection Logic into Independent Collector Packages
+              Collector Package Transition
             
           </span>
         </div>
@@ -266,18 +270,20 @@
       
   
   
+    
   
   
+  
     
     
     
     
     
-    <li class="md-nav__item md-nav__item--nested">
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
       
         
         
-        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" >
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
         
           
           <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
@@ -298,7 +304,7 @@
             <span class="md-nav__icon md-icon"></span>
           </label>
         
-        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="false">
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
           <label class="md-nav__title" for="__nav_2">
             <span class="md-nav__icon md-icon"></span>
             
@@ -388,6 +394,568 @@
   
 
       </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Collector Package Transition
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Collector Package Transition
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#purpose" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Purpose
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#1-how-the-ingestion-module-calls-the-current-collector" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1. How the ingestion module calls the current collector
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="1. How the ingestion module calls the current collector">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#http-validation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        HTTP validation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#profile-selection" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Profile selection
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#application-adapter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Application adapter
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#package-entry-point" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Package entry point
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#2-target-architecture-for-each-collaborating-team" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2. Target architecture for each collaborating team
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#3-moving-existing-collection-requests-into-the-package" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3. Moving existing collection requests into the package
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="3. Moving existing collection requests into the package">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#before-transition" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Before transition
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#after-transition" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        After transition
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-1-inventory-the-existing-request" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 1: inventory the existing request
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-2-define-the-typed-package-request" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 2: define the typed package request
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-3-isolate-provider-communication" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 3: isolate provider communication
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-4-add-a-collection-service" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 4: add a collection service
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-5-distinguish-failure-from-genuine-no-data" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 5: distinguish failure from genuine no data
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-6-make-writes-idempotent" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 6: make writes idempotent
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#4-package-output-returned-to-ingestion" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4. Package output returned to ingestion
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#5-persistence-ownership" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        5. Persistence ownership
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="5. Persistence ownership">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#mongodb-responsibilities" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        MongoDB responsibilities
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#minio-responsibilities" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        MinIO responsibilities
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#mongodb-to-minio-reference" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        MongoDB-to-MinIO reference
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#run-lifecycle" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Run lifecycle
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#6-adding-a-new-package-to-the-ingestion-application" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        6. Adding a new package to the ingestion application
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="6. Adding a new package to the ingestion application">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#step-1-install-the-package" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 1: install the package
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-2-define-validated-http-input" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 2: define validated HTTP input
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-3-add-an-adapter" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 3: add an adapter
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-4-register-the-profile" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 4: register the profile
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#step-5-map-exceptions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 5: map exceptions
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#7-configuration-and-secrets" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7. Configuration and secrets
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#8-logging-and-error-behavior" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        8. Logging and error behavior
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#9-minimum-package-tests" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        9. Minimum package tests
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#10-transition-checklist-for-collaborating-teams" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        10. Transition checklist for collaborating teams
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="10. Transition checklist for collaborating teams">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#extract-the-collector" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Extract the collector
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#persistence" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Persistence
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#ingestion-integration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Ingestion integration
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#security-and-quality" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Security and quality
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#11-current-contract-limitations-teams-must-know" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        11. Current-contract limitations teams must know
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#12-rules-that-are-mandatory-versus-recommended" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        12. Rules that are mandatory versus recommended
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="12. Rules that are mandatory versus recommended">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#mandatory-for-integration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Mandatory for integration
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#recommended-implementation-patterns" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Recommended implementation patterns
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#reference-specific-behavior-not-to-copy-blindly" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Reference-specific behavior not to copy blindly
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
     </li>
   
 
@@ -1232,6 +1800,46 @@
 
   
 
+
+  <nav class="md-path" aria-label="Navigation" >
+    <ol class="md-path__list">
+      
+        
+  
+  
+    <li class="md-path__item">
+      <a href=".." class="md-path__link">
+        
+  <span class="md-ellipsis">
+    Overview
+  </span>
+
+      </a>
+    </li>
+  
+
+      
+      
+        
+  
+  
+    
+    
+      <li class="md-path__item">
+        <a href="../architecture/" class="md-path__link">
+          
+  <span class="md-ellipsis">
+    System
+  </span>
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ol>
+  </nav>
 
               
               <article class="md-content__inner md-typeset">
