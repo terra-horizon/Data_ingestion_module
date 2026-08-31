@@ -12,6 +12,7 @@ nav:
     - Architecture: architecture.md
     - API Reference: api-reference.md
     - Workflow: workflow.md
+    - Collector Package Transition: collector-package-transition-guide.md
   - Setup & Validation:
     - Deployment: deployment.md
     - Configuration: configuration.md
