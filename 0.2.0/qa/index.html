@@ -945,6 +945,8 @@
 <p>The FastAPI tests use <code>httpx.ASGITransport</code> and mock the collector boundary.
 They verify:</p>
 <ul>
+<li>liveness and readiness response contracts;</li>
+<li>sanitized HTTP <code>503</code> readiness responses;</li>
 <li>HTTP <code>200</code> success responses;</li>
 <li><code>partial</code> collector results;</li>
 <li>orchestration metadata and selected profile;</li>
@@ -955,7 +957,7 @@ They verify:</p>
 <p>These tests do not contact CDSE, MongoDB, or MinIO.</p>
 <h2 id="bundled-collector-tests">Bundled collector tests<a class="headerlink" href="#bundled-collector-tests" title="Permanent link">&para;</a></h2>
 <p>The collector has its own test suite and optional test dependencies:</p>
-<div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">&quot;app/packages/collector[test]&quot;</span>
+<div class="highlight"><pre><span></span><code>python<span class="w"> </span>-m<span class="w"> </span>pip<span class="w"> </span>install<span class="w"> </span>-e<span class="w"> </span><span class="s2">"app/packages/collector[test]"</span>
 python<span class="w"> </span>-m<span class="w"> </span>pytest<span class="w"> </span>app/packages/collector/tests
 </code></pre></div>
 <p>Collector tests cover incremental state, discovery caching, retries, storage
@@ -964,8 +966,8 @@ contracts, publication, and schema validation without live CDSE calls.</p>
 <p>Start Uvicorn or the Compose service and execute
 <code>tests_external/ingestion.http</code>. For a commissioning run, retain small limits:</p>
 <div class="highlight"><pre><span></span><code><span class="p">{</span>
-<span class="w">  </span><span class="nt">&quot;max_days_per_run&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;max_tiles_per_run&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span>
+<span class="w">  </span><span class="nt">"max_days_per_run"</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"max_tiles_per_run"</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span>
 <span class="p">}</span>
 </code></pre></div>
 <p>Confirm:</p>

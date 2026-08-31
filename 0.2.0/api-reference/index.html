@@ -410,6 +410,28 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#get-healthlive" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /health/live
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#get-healthready" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /health/ready
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#post-apiingestionrun" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -832,6 +854,28 @@
     <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
       
         <li class="md-nav__item">
+  <a href="#get-healthlive" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /health/live
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#get-healthready" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        GET /health/ready
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
   <a href="#post-apiingestionrun" class="md-nav__link">
     <span class="md-ellipsis">
       
@@ -954,23 +998,46 @@
 <div class="highlight"><pre><span></span><code>http://127.0.0.1:8000
 </code></pre></div>
 <p>Interactive OpenAPI documentation is available at <code>/docs</code>.</p>
+<h2 id="get-healthlive">GET /health/live<a class="headerlink" href="#get-healthlive" title="Permanent link">&para;</a></h2>
+<p>Returns HTTP <code>200</code> when the FastAPI process is running:</p>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">"status"</span><span class="p">:</span><span class="w"> </span><span class="s2">"ok"</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>This endpoint does not contact external dependencies.</p>
+<h2 id="get-healthready">GET /health/ready<a class="headerlink" href="#get-healthready" title="Permanent link">&para;</a></h2>
+<p>Checks required storage configuration, MongoDB connectivity, and access to the
+configured MinIO bucket. It performs no writes. A ready service returns HTTP
+<code>200</code>:</p>
+<div class="highlight"><pre><span></span><code><span class="p">{</span>
+<span class="w">  </span><span class="nt">"status"</span><span class="p">:</span><span class="w"> </span><span class="s2">"ready"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"checks"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">"configuration"</span><span class="p">:</span><span class="w"> </span><span class="s2">"ok"</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"mongodb"</span><span class="p">:</span><span class="w"> </span><span class="s2">"ok"</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"minio"</span><span class="p">:</span><span class="w"> </span><span class="s2">"ok"</span>
+<span class="w">  </span><span class="p">}</span>
+<span class="p">}</span>
+</code></pre></div>
+<p>An unavailable dependency returns HTTP <code>503</code>. The response identifies only the
+failed dependency and does not expose connection strings, credentials, or
+internal exception details.</p>
 <h2 id="post-apiingestionrun">POST /api/ingestion/run<a class="headerlink" href="#post-apiingestionrun" title="Permanent link">&para;</a></h2>
 <p>Runs the process selected by <code>profile</code>. The current implementation supports
 only <code>forecaster-collector</code> with provider <code>sentinel-2</code>.</p>
 <h3 id="request">Request<a class="headerlink" href="#request" title="Permanent link">&para;</a></h3>
 <div class="highlight"><pre><span></span><code><span class="p">{</span>
-<span class="w">  </span><span class="nt">&quot;run_job_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;job-sperchios-20260814-001&quot;</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;triggered_at&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2026-08-14T07:30:00+03:00&quot;</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;provider&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;sentinel-2&quot;</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;profile&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;forecaster-collector&quot;</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;aoi_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;sperchios&quot;</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;bbox&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="mf">22.433493</span><span class="p">,</span><span class="w"> </span><span class="mf">38.837552</span><span class="p">,</span><span class="w"> </span><span class="mf">22.569555</span><span class="p">,</span><span class="w"> </span><span class="mf">38.894223</span><span class="p">],</span>
-<span class="w">  </span><span class="nt">&quot;run_name&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;sperchios&quot;</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;history_start&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2016-01-01&quot;</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;target_date&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2026-08-14&quot;</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;mode&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;auto&quot;</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;max_days_per_run&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;max_tiles_per_run&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span>
+<span class="w">  </span><span class="nt">"run_job_id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"job-sperchios-20260814-001"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"triggered_at"</span><span class="p">:</span><span class="w"> </span><span class="s2">"2026-08-14T07:30:00+03:00"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"provider"</span><span class="p">:</span><span class="w"> </span><span class="s2">"sentinel-2"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"profile"</span><span class="p">:</span><span class="w"> </span><span class="s2">"forecaster-collector"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"aoi_id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"sperchios"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"bbox"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="mf">22.433493</span><span class="p">,</span><span class="w"> </span><span class="mf">38.837552</span><span class="p">,</span><span class="w"> </span><span class="mf">22.569555</span><span class="p">,</span><span class="w"> </span><span class="mf">38.894223</span><span class="p">],</span>
+<span class="w">  </span><span class="nt">"run_name"</span><span class="p">:</span><span class="w"> </span><span class="s2">"sperchios"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"history_start"</span><span class="p">:</span><span class="w"> </span><span class="s2">"2016-01-01"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"target_date"</span><span class="p">:</span><span class="w"> </span><span class="s2">"2026-08-14"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"mode"</span><span class="p">:</span><span class="w"> </span><span class="s2">"auto"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"max_days_per_run"</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"max_tiles_per_run"</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span>
 <span class="p">}</span>
 </code></pre></div>
 <table>
@@ -1047,33 +1114,33 @@ only <code>forecaster-collector</code> with provider <code>sentinel-2</code>.</p
 <h3 id="successful-response">Successful response<a class="headerlink" href="#successful-response" title="Permanent link">&para;</a></h3>
 <p>Both complete and partial collector outcomes return HTTP <code>200</code>.</p>
 <div class="highlight"><pre><span></span><code><span class="p">{</span>
-<span class="w">  </span><span class="nt">&quot;run_job_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;job-sperchios-20260814-001&quot;</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;provider&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;sentinel-2&quot;</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;profile&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;forecaster-collector&quot;</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;aoi_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;sperchios&quot;</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;triggered_at&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2026-08-14T07:30:00+03:00&quot;</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;started_at&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2026-08-14T04:30:01Z&quot;</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;completed_at&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;2026-08-14T04:30:04Z&quot;</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;duration_ms&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">3000</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;status&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;success&quot;</span><span class="p">,</span>
-<span class="w">  </span><span class="nt">&quot;collector_result&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">    </span><span class="nt">&quot;status&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;success&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;run_dir&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;outputs/sperchios&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;run_summary&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;No new satellite data required collection.&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;mode&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;auto&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;available_dates&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
-<span class="w">    </span><span class="nt">&quot;missing_dates&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
-<span class="w">    </span><span class="nt">&quot;collected_dates&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
-<span class="w">    </span><span class="nt">&quot;new_record_count&quot;</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;failed_units&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
-<span class="w">    </span><span class="nt">&quot;latest_available_observation&quot;</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;history_json_path&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;outputs/sperchios/history/global_history.json&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;history_csv_path&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;outputs/sperchios/history/global_history.csv&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;tile_records_path&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;outputs/sperchios/tiles/tile_records.json&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;tiles_geojson_path&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;outputs/sperchios/tiles/river_tiles.geojson&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;state_path&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;outputs/sperchios/collection/state.json&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;discovery_windows&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
-<span class="w">    </span><span class="nt">&quot;warnings&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">[]</span>
+<span class="w">  </span><span class="nt">"run_job_id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"job-sperchios-20260814-001"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"provider"</span><span class="p">:</span><span class="w"> </span><span class="s2">"sentinel-2"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"profile"</span><span class="p">:</span><span class="w"> </span><span class="s2">"forecaster-collector"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"aoi_id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"sperchios"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"triggered_at"</span><span class="p">:</span><span class="w"> </span><span class="s2">"2026-08-14T07:30:00+03:00"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"started_at"</span><span class="p">:</span><span class="w"> </span><span class="s2">"2026-08-14T04:30:01Z"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"completed_at"</span><span class="p">:</span><span class="w"> </span><span class="s2">"2026-08-14T04:30:04Z"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"duration_ms"</span><span class="p">:</span><span class="w"> </span><span class="mi">3000</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"status"</span><span class="p">:</span><span class="w"> </span><span class="s2">"success"</span><span class="p">,</span>
+<span class="w">  </span><span class="nt">"collector_result"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">"status"</span><span class="p">:</span><span class="w"> </span><span class="s2">"success"</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"run_dir"</span><span class="p">:</span><span class="w"> </span><span class="s2">"outputs/sperchios"</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"run_summary"</span><span class="p">:</span><span class="w"> </span><span class="s2">"No new satellite data required collection."</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"mode"</span><span class="p">:</span><span class="w"> </span><span class="s2">"auto"</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"available_dates"</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">    </span><span class="nt">"missing_dates"</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">    </span><span class="nt">"collected_dates"</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">    </span><span class="nt">"new_record_count"</span><span class="p">:</span><span class="w"> </span><span class="mi">0</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"failed_units"</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">    </span><span class="nt">"latest_available_observation"</span><span class="p">:</span><span class="w"> </span><span class="kc">null</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"history_json_path"</span><span class="p">:</span><span class="w"> </span><span class="s2">"outputs/sperchios/history/global_history.json"</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"history_csv_path"</span><span class="p">:</span><span class="w"> </span><span class="s2">"outputs/sperchios/history/global_history.csv"</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"tile_records_path"</span><span class="p">:</span><span class="w"> </span><span class="s2">"outputs/sperchios/tiles/tile_records.json"</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"tiles_geojson_path"</span><span class="p">:</span><span class="w"> </span><span class="s2">"outputs/sperchios/tiles/river_tiles.geojson"</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"state_path"</span><span class="p">:</span><span class="w"> </span><span class="s2">"outputs/sperchios/collection/state.json"</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"discovery_windows"</span><span class="p">:</span><span class="w"> </span><span class="p">[],</span>
+<span class="w">    </span><span class="nt">"warnings"</span><span class="p">:</span><span class="w"> </span><span class="p">[]</span>
 <span class="w">  </span><span class="p">}</span>
 <span class="p">}</span>
 </code></pre></div>
@@ -1082,10 +1149,10 @@ only <code>forecaster-collector</code> with provider <code>sentinel-2</code>.</p
 portable MongoDB or MinIO references.</p>
 <h3 id="handled-errors">Handled errors<a class="headerlink" href="#handled-errors" title="Permanent link">&para;</a></h3>
 <div class="highlight"><pre><span></span><code><span class="p">{</span>
-<span class="w">  </span><span class="nt">&quot;detail&quot;</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
-<span class="w">    </span><span class="nt">&quot;code&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;collector_unavailable&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;message&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;MinIO preflight failed ...&quot;</span><span class="p">,</span>
-<span class="w">    </span><span class="nt">&quot;run_job_id&quot;</span><span class="p">:</span><span class="w"> </span><span class="s2">&quot;job-sperchios-20260814-001&quot;</span>
+<span class="w">  </span><span class="nt">"detail"</span><span class="p">:</span><span class="w"> </span><span class="p">{</span>
+<span class="w">    </span><span class="nt">"code"</span><span class="p">:</span><span class="w"> </span><span class="s2">"collector_unavailable"</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"message"</span><span class="p">:</span><span class="w"> </span><span class="s2">"MinIO preflight failed ..."</span><span class="p">,</span>
+<span class="w">    </span><span class="nt">"run_job_id"</span><span class="p">:</span><span class="w"> </span><span class="s2">"job-sperchios-20260814-001"</span>
 <span class="w">  </span><span class="p">}</span>
 <span class="p">}</span>
 </code></pre></div>
@@ -1125,7 +1192,7 @@ portable MongoDB or MinIO references.</p>
 </tr>
 </tbody>
 </table>
-<p>The service currently exposes no <code>/api/health</code> or <code>/api/sources</code> endpoints.</p>
+<p>The service currently exposes no <code>/api/sources</code> endpoint.</p>
 
 
 
