@@ -125,6 +125,7 @@ not contact CDSE, MongoDB, or MinIO.
 
 ## Documentation
 
-Detailed architecture, API, configuration, deployment, workflow, and QA guides
-are under `docs/docs`. Build them from `docs/` with MkDocs when the documentation
-tooling is installed.
+Detailed architecture, API, configuration, deployment, workflow, and QA guides are available:
+
+- **Local:** `docs/docs/` - Build with MkDocs when documentation tooling is installed
+- **Online:** [Data_ingestion_module/latest](https://terra-horizon.github.io/Data_ingestion_module/latest/)
