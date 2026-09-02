@@ -6,11 +6,16 @@ services:
     image: data-ingestion-module:local
     env_file:
       - .env
-    ports:
-      - "8000:8000"
     networks:
       - terra-network
     restart: unless-stopped
+    labels:
+      io.portainer.accesscontrol.teams: terra-team
+
+    # Add only if the API must be reached from the host reverse proxy.
+    # First verify that host port 18000 is unused.
+    ports:
+      - "127.0.0.1:18000:8000"
 
 networks:
   terra-network:
