@@ -1,4 +1,5 @@
 @baseUrl = http://127.0.0.1:8000
+@productionUrl = https://server.iprism.eu/data-ingestion
 
 ### Liveness: confirms that the FastAPI process is running
 GET {{baseUrl}}/health/live
@@ -7,3 +8,12 @@ Accept: application/json
 ### Readiness: validates configuration, MongoDB, and MinIO connectivity
 GET {{baseUrl}}/health/ready
 Accept: application/json
+
+### Live health check for the ingestion service
+GET {{productionUrl}}/health/live
+Content-Type: application/json
+Accept: application/json
+
+### Live readiness check for the ingestion service
+GET {{productionUrl}}/health/ready
+Content-Type: application/json

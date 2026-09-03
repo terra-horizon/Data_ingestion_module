@@ -117,3 +117,26 @@ Accept: application/json
   "mode": "auto",
   "max_days_per_run": 1
 }
+
+### Live testing of data ingestion endpoint on the production server
+POST https://server.iprism.eu/data-ingestion/api/ingestion/run
+Content-Type: application/json
+Accept: application/json
+
+{
+  "run_job_id": "job-sperchios-20260827",
+  "triggered_at": "2026-08-27T09:00:00+03:00",
+  "provider": "sentinel-2",
+  "profile": "forecaster-collector",
+  "aoi_id": "live_sperchios_v1",
+  "bbox": [
+    22.433493,
+    38.837552,
+    22.569555,
+    38.894223
+  ],
+  "run_name": "live_sperchios_v1",
+  "history_start": "2026-09-01",
+  "mode": "auto",
+  "max_days_per_run": 1
+}
