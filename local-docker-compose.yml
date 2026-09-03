@@ -1,0 +1,18 @@
+services:
+  data-ingestion-module:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: data-ingestion-module:local
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"
+    networks:
+      - terra-network
+    restart: unless-stopped
+
+networks:
+  terra-network:
+    external: true
+    name: terra-network
