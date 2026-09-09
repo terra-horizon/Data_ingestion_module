@@ -8,6 +8,15 @@ http://127.0.0.1:8000
 
 Interactive OpenAPI documentation is available at `/docs`.
 
+Production base URL:
+
+```text
+https://server.iprism.eu/data-ingestion
+```
+
+Append the endpoint path to the base URL, retaining the `/data-ingestion`
+prefix for production calls.
+
 ## GET /health/live
 
 Returns HTTP `200` when the FastAPI process is running:
@@ -80,6 +89,37 @@ only `forecaster-collector` with provider `sentinel-2`.
 | `max_days_per_run` | No | Positive limit for missing dates processed in this invocation. |
 | `max_tiles_per_run` | No | Positive limit for tiles processed in this invocation. |
 
+### Production request example
+
+The production call in `tests_external/ingestion.http` runs Sentinel-2 ingestion
+for `live_sperchios_v1`:
+
+```json
+POST https://server.iprism.eu/data-ingestion/api/ingestion/run
+Content-Type: application/json
+Accept: application/json
+
+{
+  "run_job_id": "job-sperchios-20260827",
+  "triggered_at": "2026-08-27T09:00:00+03:00",
+  "provider": "sentinel-2",
+  "profile": "forecaster-collector",
+  "aoi_id": "live_sperchios_v1",
+  "bbox": [22.433493, 38.837552, 22.569555, 38.894223],
+  "run_name": "live_sperchios_v1",
+  "history_start": "2026-09-01",
+  "mode": "auto",
+  "max_days_per_run": 1
+}
+```
+
+This example processes at most one missing date per invocation. It omits
+`max_tiles_per_run`, so no per-request tile limit is supplied, and omits
+`target_date`, so the adapter uses the current UTC date as the inclusive end
+date. The identifiers and dates above reproduce the saved request; update them
+for the intended run. Production calls use the same request fields, response
+structure, and handled errors documented here.
+
 ### Successful response
 
 Both complete and partial collector outcomes return HTTP `200`.
@@ -117,7 +157,7 @@ Both complete and partial collector outcomes return HTTP `200`.
 }
 ```
 
-The exact `collector_result` follows the bundled collector's
+The exact `collector_result` follows the installed collector package's
 `CollectionResult.to_dict()` contract. Local paths are execution details, not
 portable MongoDB or MinIO references.
 
@@ -140,5 +180,3 @@ portable MongoDB or MinIO references.
 | `503` | `collector_unavailable` | MongoDB or MinIO preflight failed. |
 | `500` | `collector_execution_error` | An unexpected collector failure was hidden behind a stable public message. |
 | `422` | FastAPI validation detail | Request fields failed schema validation. |
-
-The service currently exposes no `/api/sources` endpoint.
