@@ -22,17 +22,18 @@ They verify:
 
 These tests do not contact CDSE, MongoDB, or MinIO.
 
-## Bundled collector tests
+## Collector package tests
 
-The collector has its own test suite and optional test dependencies:
+The collector's unit tests are owned and run in its source repository. This
+repository tests the installed package at the adapter boundary:
 
 ```bash
-python -m pip install -e "app/packages/collector[test]"
-python -m pytest app/packages/collector/tests
+python -m pip install -e ".[test]"
+python -m pytest
 ```
 
-Collector tests cover incremental state, discovery caching, retries, storage
-contracts, publication, and schema validation without live CDSE calls.
+The owning collector repository is responsible for its incremental-state,
+discovery-cache, retry, storage-publication, and schema-validation tests.
 
 ## Manual API test
 

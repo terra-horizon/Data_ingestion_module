@@ -49,9 +49,10 @@ External caller
 
 The ingestion application should not contain provider API calls, provider credentials, response parsing, domain transformations, or collector persistence logic. Those responsibilities belong in the independent package. The ingestion application validates and routes requests, invokes the package, and translates its result or exceptions into an HTTP response.
 
-The current reference implementation is `app/packages/collector`, installed as the Python distribution `terra-data-collection` and imported as `data_collection`.
-
-**Important Note on Architecture:** We are temporarily starting with direct package installations. The long-term plan is to migrate to containerized execution via GHCR, where teams publish container images for their packages and the ingestion service dynamically pulls and executes them on demand.
+The current reference implementation is maintained in the
+[`collector` subdirectory of `terra-horizon/uc1.forecaster.uth.alpha`](https://github.com/terra-horizon/uc1.forecaster.uth.alpha/tree/main/collector).
+This application pins that subdirectory as the `terra-data-collection` Git
+dependency and imports it as `data_collection`.
 
 ## 1. How the ingestion module calls the current collector
 
@@ -604,22 +605,28 @@ The caller-owned `run_job_id` and collector-generated `run_id` are different ide
 
 ### Step 1: install the package
 
-The root application currently installs the reference package explicitly:
+The root application declares the reference collector as a PEP 508 direct Git
+dependency in `pyproject.toml`. The full commit SHA makes installation
+reproducible, while `subdirectory=collector` tells pip to build and install
+only that package directory. Pip may still clone repository data temporarily;
+the other directories are not installed or added to this repository:
 
-```dockerfile
-RUN python -m pip install --no-cache-dir ./app/packages/collector .
+```toml
+"terra-data-collection @ git+https://github.com/terra-horizon/uc1.forecaster.uth.alpha.git@<full-commit-sha>#subdirectory=collector"
 ```
 
-Add the new package to the image build, for example:
+Another team package should use the same pinned dependency form when its source
+is a packageable subdirectory of a separate repository:
 
-```dockerfile
-RUN python -m pip install --no-cache-dir \
-    ./app/packages/collector \
-    ./app/packages/<team-collector> \
-    .
+```toml
+"team-collector-distribution @ git+https://github.com/<organization>/<repository>.git@<full-commit-sha>#subdirectory=<package-directory>"
 ```
 
-The package must support the application's Python 3.12 runtime and must declare all dependencies in its own `pyproject.toml`.
+The application image installs Git before `pip install .`, allowing pip to
+fetch these VCS dependencies during the image build. The package must support
+the application's Python 3.12 runtime and declare all dependencies in its own
+`pyproject.toml`. Private repositories additionally require an approved build
+credential mechanism; credentials must not be embedded in the dependency URL.
 
 ### Step 2: define validated HTTP input
 
@@ -867,4 +874,3 @@ These items are **not defined by the current collector contract**. Teams should 
 - ambiguous use of `collected` for terminal unavailable records;
 - strict non-overlapping discovery without a late-arrival lookback policy;
 - returning operating-system-specific local paths as durable references.
-

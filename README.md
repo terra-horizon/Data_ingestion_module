@@ -5,10 +5,12 @@ through a profile-based ingestion endpoint. The service validates orchestration
 requests, selects a registered process profile, runs the collector outside the
 async event loop, and returns run metadata with the collector result.
 
-The collector is temporarily bundled at `app/packages/collector`. It remains a
-separate installable Python package and owns CDSE discovery, river tiling,
-collection state, MongoDB persistence, and MinIO publication. Replace the
-bundled copy with the organization-managed package when it becomes available.
+The collector is maintained in the
+[`uc1.forecaster.uth.alpha`](https://github.com/terra-horizon/uc1.forecaster.uth.alpha/tree/main/collector)
+repository. This application installs its `collector` subdirectory from a
+pinned Git commit as the `terra-data-collection` package. The collector owns
+CDSE discovery, river tiling, collection state, MongoDB persistence, and MinIO
+publication.
 
 ## Data flow
 
@@ -18,7 +20,7 @@ Caller
   -> Pydantic request validation
   -> profile dispatcher
   -> forecaster-collector adapter
-  -> bundled data_collection package
+  -> externally maintained data_collection package
      -> restore observations/state/tiles from MongoDB and MinIO
      -> discover new Sentinel-2 dates through CDSE when required
      -> collect tile/date statistics
@@ -50,10 +52,10 @@ Windows PowerShell:
 .venv\Scripts\Activate.ps1
 ```
 
-Install the bundled collector, followed by the API and test dependencies:
+Install the application and test dependencies. This also fetches and installs
+the pinned collector dependency from GitHub:
 
 ```bash
-python -m pip install -e app/packages/collector
 python -m pip install -e ".[test]"
 ```
 

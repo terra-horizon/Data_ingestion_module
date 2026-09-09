@@ -13,10 +13,15 @@ Install and run:
 
 ```bash
 python -m venv .venv
-python -m pip install -e app/packages/collector
 python -m pip install -e ".[test]"
 uvicorn app.main:app --reload
 ```
+
+Installing the application builds and installs only the pinned `collector`
+subdirectory from `terra-horizon/uc1.forecaster.uth.alpha`. Pip may clone the
+source repository into a temporary directory while resolving the Git
+dependency, but no other project directory is installed or retained in this
+application repository.
 
 The API listens on `127.0.0.1:8000` by default. Swagger UI is at `/docs`.
 
@@ -25,9 +30,9 @@ The API listens on `127.0.0.1:8000` by default. Swagger UI is at `/docs`.
 The repository Dockerfile:
 
 1. starts from `python:3.12-slim`;
-2. copies the FastAPI project and bundled collector;
-3. installs the collector from `app/packages/collector`;
-4. installs the FastAPI application;
+2. installs Git and CA certificates for the pinned VCS dependency;
+3. copies the FastAPI project;
+4. installs the FastAPI application and its pinned collector dependency;
 5. starts Uvicorn on `0.0.0.0:8000`.
 
 Build directly:

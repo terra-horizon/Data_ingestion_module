@@ -1,9 +1,9 @@
 # Configuration
 
-The FastAPI layer does not maintain a second settings object yet. It passes the
-request to the bundled collector, which reads storage and CDSE configuration
-from the process environment. Copy `.env.example` to `.env` and never commit
-the populated file.
+The FastAPI layer does not maintain the collector package needed for the forecaster. It passes the
+request to the installed collector package, which reads storage and CDSE
+configuration from the process environment. Copy `.env.example` to `.env` and
+never commit the populated file.
 
 ## Environment variables
 

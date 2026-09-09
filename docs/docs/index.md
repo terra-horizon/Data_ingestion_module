@@ -4,9 +4,9 @@ The Data Ingestion Module is a Python 3.12+ FastAPI service that exposes
 server-approved ingestion processes through one validated HTTP endpoint.
 
 The current `forecaster-collector` profile invokes the TERRA UC1 Sentinel-2
-collector. The collector is temporarily bundled as an installable package at
-`app/packages/collector`; it will be replaced by the organization-managed
-package when that distribution path is available.
+collector. The independently maintained collector is installed from the
+`collector` subdirectory of `terra-horizon/uc1.forecaster.uth.alpha` at the
+Git commit pinned by this application's `pyproject.toml`.
 
 ## Current capabilities
 

@@ -12,7 +12,7 @@ selection and collector integration.
 | Request/response schemas | `app/schemas/ingestion.py` | Validate domain inputs and define the public API contract. |
 | Profile service | `app/services/ingestion.py` | Map a server-approved profile to its adapter and run blocking work in a thread. |
 | Collector adapter | `app/adapters/collector.py` | Translate API input into `CollectionRequest`, guard concurrent AOI execution, and normalize collector exceptions. |
-| Bundled collector | `app/packages/collector/data_collection` | Own discovery, tiling, collection state, local staging, MongoDB writes, and MinIO uploads. |
+| Collector package | Pinned `terra-data-collection` Git dependency | Own discovery, tiling, collection state, local staging, MongoDB writes, and MinIO uploads. |
 
 ## Request dispatch
 

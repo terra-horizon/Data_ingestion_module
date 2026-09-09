@@ -3,7 +3,7 @@
 ## What does `profile` select?
 
 It selects a server-registered process adapter. The only current value is
-`forecaster-collector`, which invokes the bundled Sentinel-2 collector.
+`forecaster-collector`, which invokes the installed TERRA UC1 collector package.
 Arbitrary commands and module names are not accepted.
 
 ## Does the endpoint run in the background?
