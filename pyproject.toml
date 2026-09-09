@@ -13,6 +13,7 @@ dependencies = [
     "httpx>=0.28,<1.0",
     "pydantic>=2.11,<3.0",
     "pydantic-settings>=2.10,<3.0",
+    "terra-data-collection @ git+https://github.com/terra-horizon/uc1.forecaster.uth.alpha.git@4c9c7ef60d823f8b794d054978c4b2db3e54baa8#subdirectory=collector",
     "uvicorn[standard]>=0.35,<1.0",
 ]
 

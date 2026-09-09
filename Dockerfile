@@ -5,9 +5,13 @@ WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ca-certificates git \
+    && rm -rf /var/lib/apt/lists/*
+
 COPY pyproject.toml README.md ./
 COPY app ./app
-RUN python -m pip install --no-cache-dir ./app/packages/collector .
+RUN python -m pip install --no-cache-dir .
 
 EXPOSE 8000
 
