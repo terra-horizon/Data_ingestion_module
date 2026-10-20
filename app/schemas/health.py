@@ -19,3 +19,12 @@ class ReadinessChecks(BaseModel):
 class ReadinessResponse(BaseModel):
     status: Literal["ready", "not_ready"]
     checks: ReadinessChecks
+
+
+class Uc3ReadinessChecks(ReadinessChecks):
+    package: HealthCheckStatus
+
+
+class Uc3ReadinessResponse(BaseModel):
+    status: Literal["ready", "not_ready"]
+    checks: Uc3ReadinessChecks
