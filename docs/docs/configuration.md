@@ -1,5 +1,9 @@
 # Configuration
 
+For the `coastal-uc3-sentinel2` package, local wheel installation and independent runtime
+settings, see [UC3 integration](uc3-integration.md). Supply its wheel in `vendor/`
+before installing the application or building its Docker image.
+
 The FastAPI layer does not maintain the collector package needed for the forecaster. It passes the
 request to the installed collector package, which reads storage and CDSE
 configuration from the process environment. Copy `.env.example` to `.env` and

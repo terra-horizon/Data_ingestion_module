@@ -1,9 +1,14 @@
 # TERRA Data Ingestion Module
 
-Python 3.12+ FastAPI service that exposes the TERRA UC1 Sentinel-2 collector
+Python 3.12+ FastAPI service that exposes the TERRA UC1 and UC3 Sentinel-2 collectors
 through a profile-based ingestion endpoint. The service validates orchestration
 requests, selects a registered process profile, runs the collector outside the
 async event loop, and returns run metadata with the collector result.
+
+For the `coastal-uc3-sentinel2` package, local wheel installation and independent runtime
+settings, see [UC3 integration](docs/docs/uc3-integration.md). Supply its wheel in `vendor/`
+before installing the application or building its Docker image.
+
 
 The collector is maintained in the
 [`uc1.forecaster.uth.alpha`](https://github.com/terra-horizon/uc1.forecaster.uth.alpha/tree/main/collector)
@@ -12,7 +17,7 @@ pinned Git commit as the `terra-data-collection` package. The collector owns
 CDSE discovery, river tiling, collection state, MongoDB persistence, and MinIO
 publication.
 
-## Data flow
+## UC1 data flow
 
 ```text
 Caller
@@ -29,7 +34,7 @@ Caller
   -> structured HTTP response
 ```
 
-The current profile is `forecaster-collector`. Profiles are server-registered;
+The profiles are `forecaster-collector` (UC1) and `coastal-uc3-sentinel2` (UC3). Profiles are server-registered;
 callers cannot provide arbitrary Python process names.
 
 ## Local setup
@@ -56,14 +61,14 @@ Install the application and test dependencies. This also fetches and installs
 the pinned collector dependency from GitHub:
 
 ```bash
-python -m pip install -e ".[test]"
+python -m pip install vendor/terra_wp2_uc3_ingestion-0.5.0-py3-none-any.whl -e ".[test]"
 ```
 
 Copy `.env.example` to `.env`, supply the required credentials and storage
 endpoints, then start the API:
 
 ```bash
-uvicorn app.main:app --reload
+uvicorn app.main:app --reload --env-file .env
 ```
 
 Swagger UI is available at <http://127.0.0.1:8000/docs>.

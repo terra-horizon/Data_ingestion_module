@@ -1,5 +1,9 @@
 # Deployment
 
+For the `coastal-uc3-sentinel2` package, local wheel installation and independent runtime
+settings, see [UC3 integration](uc3-integration.md). Supply its wheel in `vendor/`
+before installing the application or building its Docker image.
+
 ## Local Python process
 
 Requirements:
@@ -13,7 +17,7 @@ Install and run:
 
 ```bash
 python -m venv .venv
-python -m pip install -e ".[test]"
+python -m pip install vendor/terra_wp2_uc3_ingestion-0.5.0-py3-none-any.whl -e ".[test]"
 uvicorn app.main:app --reload
 ```
 
