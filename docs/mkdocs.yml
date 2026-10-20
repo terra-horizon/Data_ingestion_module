@@ -16,6 +16,8 @@ nav:
   - Setup & Validation:
     - Deployment: deployment.md
     - Configuration: configuration.md
+    - UC3 Integration: uc3-integration.md
+    - UC3 Verification: uc3-verification.md
     - Quality Assurance: qa.md
     - Pipeline Test Scenarios: pipeline-test-scenarios.md
   - Operations:
