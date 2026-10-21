@@ -17,3 +17,4 @@ outputs/
 cache/
 # Private UC3 distribution, supplied to the build separately.
 vendor/*.whl
+.vscode/
