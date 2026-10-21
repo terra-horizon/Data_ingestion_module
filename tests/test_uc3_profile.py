@@ -449,3 +449,24 @@ async def test_upstream_helpers_work_without_profile_translation(client, package
 async def test_old_profile_is_rejected(client):
     response = await client.post("/api/ingestion/run", json={**UC3_REQUEST, "profile": "uc3profile"})
     assert response.status_code == 422
+
+
+def test_uc3_catalogue_search_accepts_the_official_geojson_media_type():
+    from types import SimpleNamespace
+
+    from wp2_uc3_ingestion.cdse import CDSEClient
+
+    response = Mock(status_code=200)
+    response.json.return_value = {"features": []}
+    client = CDSEClient(SimpleNamespace(cdse_catalog_url="https://catalogue.example/search"))
+    client._post = Mock(return_value=response)
+
+    result = client.search({
+        "aoi": {"bbox_wgs84": [0.0, 0.0, 1.0, 1.0]},
+        "time_range": {"from": "2026-10-01T00:00:00Z", "to": "2026-10-02T00:00:00Z"},
+        "selection": {"max_catalogue_cloud_cover_pct": 80.0},
+        "data_specification": {"collection": "sentinel-2-l2a"},
+    })
+
+    assert result["catalogue_entries"] == 0
+    assert client._post.call_args.kwargs["accept"] == "application/geo+json"
