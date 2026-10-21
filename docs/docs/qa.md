@@ -28,7 +28,7 @@ The collector's unit tests are owned and run in its source repository. This
 repository tests the installed package at the adapter boundary:
 
 ```bash
-python -m pip install vendor/terra_wp2_uc3_ingestion-0.5.0-py3-none-any.whl -e ".[test]"
+python -m pip install vendor/terra_wp2_uc3_ingestion-0.5.1-py3-none-any.whl -e ".[test]"
 python -m pytest
 ```
 

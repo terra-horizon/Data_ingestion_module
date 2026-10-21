@@ -8,12 +8,12 @@ Use Python 3.12 and the application virtual environment. From the application ro
 
 ```powershell
 .venv\Scripts\python.exe -m pip wheel --no-deps --wheel-dir vendor "<UC3_SOURCE_ROOT>"
-.venv\Scripts\python.exe -m pip install vendor/terra_wp2_uc3_ingestion-0.5.0-py3-none-any.whl -e ".[test]"
+.venv\Scripts\python.exe -m pip install vendor/terra_wp2_uc3_ingestion-0.5.1-py3-none-any.whl -e ".[test]"
 .venv\Scripts\python.exe -m pip check
 .venv\Scripts\python.exe -c "from wp2_uc3_ingestion.profile import run_profile; from wp2_uc3_ingestion.contract import load_schema; from wp2_uc3_ingestion.requests_builder import load_authorised_aois; print(load_schema('acquisition_request')['title']); print(len(load_authorised_aois()['aois']))"
 ```
 
-Building can create build metadata in the supplied source tree. To leave that tree untouched, copy its `pyproject.toml`, `README.md`, and `wp2_uc3_ingestion/` into an ignored `build/uc3-source/` directory and use that as the build source. The package's setuptools configuration includes schemas, examples and the AOI registry. No private GitHub access is needed at build time once the authorised source handover is available. The existing UC1 dependency still uses its own Git URL.
+For future upgrades, obtain the team's official wheel or its complete source distribution metadata with the source handoff; do not assume the current local packaging scaffold represents future package metadata. The wheel includes schemas, examples and the AOI registry. No private GitHub access is needed at build time when the authorised wheel is supplied. The existing UC1 dependency still uses its own Git URL.
 
 If the pip build frontend stalls, the installed setuptools backend can build the copied source without downloading build tools. From `build/uc3-source/`:
 
@@ -21,7 +21,7 @@ If the pip build frontend stalls, the installed setuptools backend can build the
 ..\..\.venv\Scripts\python.exe -c "import setuptools.build_meta; print(setuptools.build_meta.build_wheel('../../vendor'))"
 ```
 
-The application pins `terra-wp2-uc3-ingestion==0.5.0`. UC3's dependency ranges allow UC1's pinned pymongo, requests and python-dotenv versions. Do not apply the team's standalone `constraints-py312.txt` wholesale: its pins differ from UC1's. Resolve the wheel and application together and run `pip check`.
+The application pins `terra-wp2-uc3-ingestion==0.5.1`. This release changes the CDSE catalogue request's `Accept` header to `application/geo+json`, which the catalogue endpoint requires. The catalogue URL remains the package's official default. UC3's dependency ranges allow UC1's pinned pymongo, requests and python-dotenv versions. Do not apply the team's standalone `constraints-py312.txt` wholesale: its pins differ from UC1's. Resolve the wheel and application together and run `pip check`.
 
 ## Docker and upgrades
 
@@ -88,12 +88,12 @@ Tests use the real package for contract translation and resource checks, with ac
 
 ## Manual test from Windows
 
-Validation on 19 October 2026: `data-ingestion-module:uc3-test` built successfully on Docker Desktop Linux/amd64. All 57 tests passed inside the image, and `pip check` found no broken requirements. An isolated HTTP smoke test confirmed liveness 200, UC3 OpenAPI registration, all 15 bundled AOIs, and readiness 503 with `package: ok` when configuration was absent. No live acquisition or production storage access was performed.
+The previous `0.5.0` image passed the Docker and offline API checks described in the earlier integration validation. The current `0.5.1` wheel must be installed and checked before use; package-level catalogue behavior can be regression-checked offline without making a CDSE request. No live acquisition or production storage access is part of that check.
 
 If Docker cannot read a wheel built by a sandboxed Windows process, reset only that artifact's permissions to inherit from its parent directory, then rebuild:
 
 ```powershell
-icacls vendor\terra_wp2_uc3_ingestion-0.5.0-py3-none-any.whl /reset
+icacls vendor\terra_wp2_uc3_ingestion-0.5.1-py3-none-any.whl /reset
 ```
 
 Add the UC3 settings from `.env.example` to your existing private `.env`; retain the UC1 values. For a host Python process, use storage addresses reachable from Windows, not container-only DNS names. Start the application from the project root:
@@ -123,7 +123,7 @@ Use port `18001` for the URLs above. This runs separately from the Compose servi
 
 ## Deploying the Git checkout on the server
 
-Commit the application, tests, configuration template and documentation. Deliver `vendor/terra_wp2_uc3_ingestion-0.5.0-py3-none-any.whl` separately to the server's checkout via private file transfer or artifact storage: it is Git-ignored, so `git pull` alone cannot supply it. Alternatively deliver a built application image through a private image registry. Do not commit the wheel, source handover, or `.env`.
+Commit the application, tests, configuration template and documentation. Deliver `vendor/terra_wp2_uc3_ingestion-0.5.1-py3-none-any.whl` separately to the server's checkout via private file transfer or artifact storage: it is Git-ignored, so `git pull` alone cannot supply it. Alternatively deliver a built application image through a private image registry. Do not commit the wheel, source handover, or `.env`.
 
 Merge the UC3 variables into the server's existing private `.env`. The intended shared deployment settings are:
 

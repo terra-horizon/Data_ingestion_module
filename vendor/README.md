@@ -14,7 +14,7 @@ Before installing the application or building its Docker image, the following wh
 
 ```text
 vendor/
-└── terra_wp2_uc3_ingestion-0.5.0-py3-none-any.whl
+└── terra_wp2_uc3_ingestion-0.5.1-py3-none-any.whl
 ```
 
 The wheel is intentionally excluded from version control through `.gitignore`.

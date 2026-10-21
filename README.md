@@ -61,7 +61,7 @@ Install the application and test dependencies. This also fetches and installs
 the pinned collector dependency from GitHub:
 
 ```bash
-python -m pip install vendor/terra_wp2_uc3_ingestion-0.5.0-py3-none-any.whl -e ".[test]"
+python -m pip install vendor/terra_wp2_uc3_ingestion-0.5.1-py3-none-any.whl -e ".[test]"
 ```
 
 Copy `.env.example` to `.env`, supply the required credentials and storage
