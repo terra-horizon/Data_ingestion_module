@@ -88,7 +88,7 @@ Tests use the real package for contract translation and resource checks, with ac
 
 ## Manual test from Windows
 
-The previous `0.5.0` image passed the Docker and offline API checks described in the earlier integration validation. The current `0.5.1` wheel must be installed and checked before use; package-level catalogue behavior can be regression-checked offline without making a CDSE request. No live acquisition or production storage access is part of that check.
+The current `0.5.1` wheel must be installed and checked before use; package-level catalogue behavior can be regression-checked offline without making a CDSE request. No live acquisition or production storage access is part of that check.
 
 If Docker cannot read a wheel built by a sandboxed Windows process, reset only that artifact's permissions to inherit from its parent directory, then rebuild:
 
