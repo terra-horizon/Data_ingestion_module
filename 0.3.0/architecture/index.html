@@ -1,0 +1,1493 @@
+
+<!doctype html>
+<html lang="en" class="no-js">
+  <head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://terra-horizon.github.io/Data_ingestion_module/0.3.0/architecture/">
+      
+      
+        <link rel="prev" href="..">
+      
+      
+        <link rel="next" href="../api-reference/">
+      
+      
+        
+      
+      
+      <link rel="icon" href="../images/favicon.ico">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.7">
+    
+    
+      
+        <title>Architecture - TERRA Data Ingestion Module Docs</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.ec1eaa64.min.css">
+      
+      
+
+
+    
+    
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../stylesheets/custom-footer.css">
+    
+      <link rel="stylesheet" href="../stylesheets/mkdocsoad.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
+
+  </head>
+  
+  
+    <body dir="ltr">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#architecture" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+          <aside class="md-banner md-banner--warning">
+            <div class="md-banner__inner md-grid md-typeset">
+              
+  
+  <div>
+    You're not viewing the latest version.
+    <a href="../..">
+      <strong>Click here to go to latest.</strong>
+    </a>
+  </div>
+
+            </div>
+            <script>var el=document.querySelector("[data-md-component=outdated]"),base=new URL(".."),outdated=__md_get("__outdated",sessionStorage,base);!0===outdated&&el&&(el.hidden=!1)</script>
+          </aside>
+        
+      </div>
+    
+    
+      
+
+  
+
+<header class="md-header md-header--shadow" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href=".." title="TERRA Data Ingestion Module Docs" class="md-header__button md-logo" aria-label="TERRA Data Ingestion Module Docs" data-md-component="logo">
+      
+  <img src="../images/TERRA_Logo_Header.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"/></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            TERRA Data Ingestion Module Docs
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              Architecture
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"/></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>
+        </button>
+      </nav>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/terra-horizon/Data_ingestion_module/" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+
+<nav class="md-nav md-nav--primary" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href=".." title="TERRA Data Ingestion Module Docs" class="md-nav__button md-logo" aria-label="TERRA Data Ingestion Module Docs" data-md-component="logo">
+      
+  <img src="../images/TERRA_Logo_Header.png" alt="logo">
+
+    </a>
+    TERRA Data Ingestion Module Docs
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/terra-horizon/Data_ingestion_module/" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M173.9 397.4c0 2-2.3 3.6-5.2 3.6-3.3.3-5.6-1.3-5.6-3.6 0-2 2.3-3.6 5.2-3.6 3-.3 5.6 1.3 5.6 3.6m-31.1-4.5c-.7 2 1.3 4.3 4.3 4.9 2.6 1 5.6 0 6.2-2s-1.3-4.3-4.3-5.2c-2.6-.7-5.5.3-6.2 2.3m44.2-1.7c-2.9.7-4.9 2.6-4.6 4.9.3 2 2.9 3.3 5.9 2.6 2.9-.7 4.9-2.6 4.6-4.6-.3-1.9-3-3.2-5.9-2.9M252.8 8C114.1 8 8 113.3 8 252c0 110.9 69.8 205.8 169.5 239.2 12.8 2.3 17.3-5.6 17.3-12.1 0-6.2-.3-40.4-.3-61.4 0 0-70 15-84.7-29.8 0 0-11.4-29.1-27.8-36.6 0 0-22.9-15.7 1.6-15.4 0 0 24.9 2 38.6 25.8 21.9 38.6 58.6 27.5 72.9 20.9 2.3-16 8.8-27.1 16-33.7-55.9-6.2-112.3-14.3-112.3-110.5 0-27.5 7.6-41.3 23.6-58.9-2.6-6.5-11.1-33.3 2.6-67.9 20.9-6.5 69 27 69 27 20-5.6 41.5-8.5 62.8-8.5s42.8 2.9 62.8 8.5c0 0 48.1-33.6 69-27 13.7 34.7 5.2 61.4 2.6 67.9 16 17.7 25.8 31.5 25.8 58.9 0 96.5-58.9 104.2-114.8 110.5 9.2 7.9 17 22.9 17 46.4 0 33.7-.3 75.4-.3 83.6 0 6.5 4.6 14.4 17.3 12.1C436.2 457.8 504 362.9 504 252 504 113.3 391.5 8 252.8 8M105.2 352.9c-1.3 1-1 3.3.7 5.2 1.6 1.6 3.9 2.3 5.2 1 1.3-1 1-3.3-.7-5.2-1.6-1.6-3.9-2.3-5.2-1m-10.8-8.1c-.7 1.3.3 2.9 2.3 3.9 1.6 1 3.6.7 4.3-.7.7-1.3-.3-2.9-2.3-3.9-2-.6-3.6-.3-4.3.7m32.4 35.6c-1.6 1.3-1 4.3 1.3 6.2 2.3 2.3 5.2 2.6 6.5 1 1.3-1.3.7-4.3-1.3-6.2-2.2-2.3-5.2-2.6-6.5-1m-11.4-14.7c-1.6 1-1.6 3.6 0 5.9s4.3 3.3 5.6 2.3c1.6-1.3 1.6-3.9 0-6.2-1.4-2.3-4-3.3-5.6-2"/></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href=".." class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Overview
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+    
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--active md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_2" checked>
+        
+          
+          <label class="md-nav__link" for="__nav_2" id="__nav_2_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    System
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_2_label" aria-expanded="true">
+          <label class="md-nav__title" for="__nav_2">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    System
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+    
+  
+  
+  
+    <li class="md-nav__item md-nav__item--active">
+      
+      <input class="md-nav__toggle md-toggle" type="checkbox" id="__toc">
+      
+      
+        
+      
+      
+        <label class="md-nav__link md-nav__link--active" for="__toc">
+          
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+          <span class="md-nav__icon md-icon"></span>
+        </label>
+      
+      <a href="./" class="md-nav__link md-nav__link--active">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Architecture
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+      
+        
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#components" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Components
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#request-dispatch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Request Dispatch
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#adapter-and-collector-integration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Adapter and Collector Integration
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#persistence-boundary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Persistence Boundary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuration-and-dependency-isolation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration and Dependency Isolation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#state-and-restart-behavior" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        State and Restart Behavior
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#health-and-readiness" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Health and Readiness
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#current-operational-limits" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Current Operational Limits
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#extensibility" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Extensibility
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+      
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api-reference/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../workflow/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Workflow
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../collector-package-transition-guide/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Collector Package Transition
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_3" >
+        
+          
+          <label class="md-nav__link" for="__nav_3" id="__nav_3_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Setup & Validation
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_3_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_3">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Setup & Validation
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../deployment/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Deployment
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../configuration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Configuration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../uc3-integration/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    UC3 Integration
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../qa/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Quality Assurance
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../pipeline-test-scenarios/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Pipeline Test Scenarios
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    
+    
+    
+    
+    
+    <li class="md-nav__item md-nav__item--nested">
+      
+        
+        
+        <input class="md-nav__toggle md-toggle " type="checkbox" id="__nav_4" >
+        
+          
+          <label class="md-nav__link" for="__nav_4" id="__nav_4_label" tabindex="0">
+            
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Operations
+  
+
+    
+  </span>
+  
+  
+
+            <span class="md-nav__icon md-icon"></span>
+          </label>
+        
+        <nav class="md-nav" data-md-level="1" aria-labelledby="__nav_4_label" aria-expanded="false">
+          <label class="md-nav__title" for="__nav_4">
+            <span class="md-nav__icon md-icon"></span>
+            
+  
+    Operations
+  
+
+          </label>
+          <ul class="md-nav__list" data-md-scrollfix>
+            
+              
+                
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../faq/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    FAQ
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+              
+            
+          </ul>
+        </nav>
+      
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../license/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    License
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="https://terra-horizon.github.io/" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc" >
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#overview" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Overview
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#components" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Components
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#request-dispatch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Request Dispatch
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#adapter-and-collector-integration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Adapter and Collector Integration
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#persistence-boundary" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Persistence Boundary
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#configuration-and-dependency-isolation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Configuration and Dependency Isolation
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#state-and-restart-behavior" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        State and Restart Behavior
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#health-and-readiness" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Health and Readiness
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#current-operational-limits" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Current Operational Limits
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#extensibility" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Extensibility
+      
+    </span>
+  </a>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+                
+
+
+
+  
+
+
+  <nav class="md-path" aria-label="Navigation" >
+    <ol class="md-path__list">
+      
+        
+  
+  
+    <li class="md-path__item">
+      <a href=".." class="md-path__link">
+        
+  <span class="md-ellipsis">
+    Overview
+  </span>
+
+      </a>
+    </li>
+  
+
+      
+      
+        
+  
+  
+    
+    
+      <li class="md-path__item">
+        <a href="./" class="md-path__link">
+          
+  <span class="md-ellipsis">
+    System
+  </span>
+
+        </a>
+      </li>
+    
+  
+
+      
+    </ol>
+  </nav>
+
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+  
+
+
+<!-- # Architecture
+
+## Components
+
+The service is intentionally small and separates HTTP concerns from process
+selection and collector integration.
+
+| Layer | Location | Responsibility |
+| --- | --- | --- |
+| FastAPI application | `app/main.py` | Create the application and register API routers. |
+| HTTP route | `app/api/routes/ingestion.py` | Measure execution, map known failures to HTTP responses, and construct the response envelope. |
+| Request/response schemas | `app/schemas/ingestion.py` | Validate domain inputs and define the public API contract. |
+| Profile service | `app/services/ingestion.py` | Map a server-approved profile to its adapter and run blocking work in a thread. |
+| Collector adapter | `app/adapters/collector.py` | Translate API input into `CollectionRequest`, guard concurrent AOI execution, and normalize collector exceptions. |
+| Collector package | Pinned `terra-data-collection` Git dependency | Own discovery, tiling, collection state, local staging, MongoDB writes, and MinIO uploads. |
+
+## Request dispatch
+
+<div class="highlight"><pre><span></span><code>POST /api/ingestion/run
+  -&gt; Pydantic validation
+  -&gt; profile registry
+  -&gt; forecaster-collector adapter
+  -&gt; worker thread
+  -&gt; data_collection.collect()
+  -&gt; collector result
+  -&gt; FastAPI response envelope
+</code></pre></div>
+
+Profiles are a controlled extension point. A request selects a registered
+profile such as `forecaster-collector`; it cannot supply a module path,
+function name, or arbitrary command. A future process should add its own
+adapter and one registry entry rather than adding branches to the route.
+
+## Collector persistence boundary
+
+The API does not query MongoDB or MinIO after collection. Persistence is owned
+by the collector package.
+
+<div class="highlight"><pre><span></span><code>FastAPI adapter
+  -&gt; Collector
+       |-&gt; CDSE STAC and Statistical APIs
+       |-&gt; Local staging under outputs/
+       |-&gt; MongoDB (read and write)
+       `-&gt; MinIO   (read and write)
+</code></pre></div>
+
+MongoDB stores queryable observations, tiles, collection state, and pipeline
+run records. MinIO stores the stable AOI definition, canonical JSON/GeoJSON,
+and run-scoped artifacts. Local `outputs/<run_name>` files support execution
+and resumption inside the running process, but they are not cross-service
+resource identifiers.
+
+## State and restart behavior
+
+Deleting the local `outputs` directory does not necessarily cause a historical
+re-fetch. For a published run, the collector first hydrates observations from
+MongoDB and state/tile files from MinIO. If restored state says backfill is
+complete and `last_checked_date` already covers the target date, the discovery
+window count is zero and CDSE is not queried again.
+
+Use a new AOI identity for an isolated fresh run, or deliberately reset both
+MongoDB and MinIO state when testing a complete replay.
+
+## Current operational limits
+
+- Requests wait for collection to finish; long runs are subject to client,
+  proxy, and server timeouts.
+- The in-process AOI lock applies to one API process only.
+- Multiple replicas do not share a distributed lock.
+- The Compose setup expects MongoDB and MinIO to exist on `terra-network`.
+- Authentication and authorization are not implemented yet. -->
+
+<h1 id="architecture">Architecture<a class="headerlink" href="#architecture" title="Permanent link">&para;</a></h1>
+<h2 id="overview">Overview<a class="headerlink" href="#overview" title="Permanent link">&para;</a></h2>
+<p>The Data Ingestion Module is a FastAPI-based service that provides a unified interface for executing different data ingestion workflows.</p>
+<p>The architecture follows a <strong>profile-based execution model</strong>, separating HTTP request handling, validation, profile selection, collector integration, and data persistence.</p>
+<p>Each ingestion profile encapsulates a specific collection workflow while sharing the application's API and execution infrastructure.</p>
+<p>Currently supported profiles:</p>
+<ul>
+<li><strong><code>forecaster-collector</code> (UC1):</strong> Sentinel satellite data collection and statistical processing for forecasting applications.</li>
+<li><strong><code>coastal-uc3-sentinel2</code> (UC3):</strong> Sentinel-2 scene acquisition, quality assessment, raster processing, and publication.</li>
+</ul>
+<p>New ingestion workflows can be introduced by implementing an adapter and registering the corresponding profile, without modifying the core API architecture.</p>
+<h2 id="components">Components<a class="headerlink" href="#components" title="Permanent link">&para;</a></h2>
+<p>The application separates common infrastructure from profile-specific functionality.</p>
+<table>
+<thead>
+<tr>
+<th>Layer</th>
+<th>Location</th>
+<th>Responsibility</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>FastAPI application</td>
+<td><code>app/main.py</code></td>
+<td>Initialise the application and register API routers.</td>
+</tr>
+<tr>
+<td>HTTP routes</td>
+<td><code>app/api/routes/</code></td>
+<td>Handle requests, translate errors into HTTP responses, and construct response envelopes.</td>
+</tr>
+<tr>
+<td>Request/response schemas</td>
+<td><code>app/schemas/</code></td>
+<td>Validate common and profile-specific inputs and define API contracts.</td>
+</tr>
+<tr>
+<td>Profile service</td>
+<td><code>app/services/ingestion.py</code></td>
+<td>Resolve registered profiles and coordinate execution.</td>
+</tr>
+<tr>
+<td>Profile adapters</td>
+<td><code>app/adapters/</code></td>
+<td>Translate API requests into collector-specific contracts, manage execution boundaries, and normalise errors.</td>
+</tr>
+<tr>
+<td>External collector packages</td>
+<td>Installed dependencies</td>
+<td>Implement acquisition, processing, and persistence operations.</td>
+</tr>
+<tr>
+<td>Configuration</td>
+<td>Environment-based settings</td>
+<td>Provide profile-specific credentials, storage connections, and runtime parameters.</td>
+</tr>
+<tr>
+<td>Storage infrastructure</td>
+<td>MongoDB and MinIO</td>
+<td>Persist collection metadata, processing state, and generated artifacts.</td>
+</tr>
+</tbody>
+</table>
+<p>The FastAPI application remains independent of the internal implementation details of individual collectors.</p>
+<h2 id="request-dispatch">Request Dispatch<a class="headerlink" href="#request-dispatch" title="Permanent link">&para;</a></h2>
+<p>All supported ingestion profiles are accessed through a common endpoint:</p>
+<p><code>POST /api/ingestion/run</code></p>
+<div class="highlight"><pre><span></span><code>                    HTTP Client
+                         |
+                         v
+                  FastAPI Endpoint
+                         |
+                         v
+                  Request Validation
+                         |
+                         v
+                   Profile Registry
+                         |
+             +-----------+-----------+
+             |                       |
+             v                       v
+        UC1 Adapter              UC3 Adapter
+             |                       |
+             v                       v
+       UC1 Collector             UC3 Package
+             |                       |
+             +-----------+-----------+
+                         |
+                         v
+              Profile-Specific Result
+                         |
+                         v
+                API Response Envelope
+</code></pre></div>
+<p>The profile registry maps a predefined profile identifier to its corresponding adapter.</p>
+<div class="highlight"><pre><span></span><code>forecaster-collector   -&gt; UC1 collector adapter
+coastal-uc3-sentinel2  -&gt; UC3 ingestion adapter
+</code></pre></div>
+<p>Profiles are controlled extension points. API callers may select only registered profiles and cannot specify arbitrary modules, functions, or executable commands.</p>
+<p>Because collector operations are potentially blocking, adapters execute through the application's worker-thread infrastructure.</p>
+<p>The HTTP request remains open until execution completes.</p>
+<h2 id="adapter-and-collector-integration">Adapter and Collector Integration<a class="headerlink" href="#adapter-and-collector-integration" title="Permanent link">&para;</a></h2>
+<p>Each adapter provides a consistent boundary between the ingestion API and its underlying collection implementation.</p>
+<p>Adapters are responsible for:</p>
+<ul>
+<li>Translating validated API requests into collector-specific input contracts.</li>
+<li>Invoking the corresponding collector or external Python package.</li>
+<li>Managing process-local concurrency restrictions.</li>
+<li>Translating known exceptions into application-level errors.</li>
+<li>Returning structured results compatible with the shared API response envelope.</li>
+</ul>
+<p>The collectors retain responsibility for their domain-specific operations, including data discovery, acquisition, processing, validation, and publication.</p>
+<p>This design allows collectors to evolve independently without requiring changes to the common HTTP interface.</p>
+<h2 id="persistence-boundary">Persistence Boundary<a class="headerlink" href="#persistence-boundary" title="Permanent link">&para;</a></h2>
+<p>The ingestion API does not directly manage collector data persistence.</p>
+<p>Each collector owns its storage operations and interacts with the infrastructure according to its own data model.</p>
+<div class="highlight"><pre><span></span><code>                  FastAPI Application
+                          |
+                    Profile Adapter
+                          |
+                          v
+                  Collector Package
+                          |
+              +-----------+-----------+
+              |           |           |
+              v           v           v
+         External API   MongoDB     MinIO
+              |
+         Data Acquisition
+              |
+         Processing / Validation
+              |
+         Result Publication
+</code></pre></div>
+<p>The main persistence responsibilities are:</p>
+<ul>
+<li><strong>MongoDB:</strong> Stores queryable collection metadata, observations, scene information, processing state, and execution records, depending on the profile.</li>
+<li><strong>MinIO:</strong> Stores raster files, JSON/GeoJSON artifacts, collection outputs, manifests, and other binary or structured artifacts.</li>
+<li><strong>Local storage:</strong> Provides temporary execution and processing space where required by the collector.</li>
+</ul>
+<p>Storage namespaces, collection structures, and persistence strategies remain profile-specific.</p>
+<p>Local filesystem artifacts are not assumed to be persistent or accessible across container instances.</p>
+<h2 id="configuration-and-dependency-isolation">Configuration and Dependency Isolation<a class="headerlink" href="#configuration-and-dependency-isolation" title="Permanent link">&para;</a></h2>
+<p>Each ingestion profile maintains its own runtime configuration and credentials.</p>
+<p>Configuration is supplied through environment variables and validated by the corresponding collector or adapter.</p>
+<p>For example:</p>
+<ul>
+<li>UC1 uses its existing collection and storage configuration.</li>
+<li>UC3 uses the dedicated <code>UC3_INGEST_*</code> configuration namespace.</li>
+</ul>
+<p>Although profiles may share infrastructure such as MongoDB, MinIO, or external data providers, their configuration and data namespaces remain logically separated.</p>
+<p>External collector packages are installed as application dependencies. The UC3 integration uses a privately distributed Python wheel, whereas the UC1 collector uses its established dependency mechanism.</p>
+<h2 id="state-and-restart-behavior">State and Restart Behavior<a class="headerlink" href="#state-and-restart-behavior" title="Permanent link">&para;</a></h2>
+<p>State management is delegated to individual collectors.</p>
+<p>Depending on the profile, collectors may support:</p>
+<ul>
+<li>Restoration of previously collected data.</li>
+<li>Incremental acquisition based on stored processing state.</li>
+<li>Reuse of previously published artifacts.</li>
+<li>Skipping already completed collection units.</li>
+<li>Recovery from interrupted or partially completed operations.</li>
+</ul>
+<p>The application does not impose a common persistence or recovery algorithm on all profiles.</p>
+<p>Container restarts do not automatically imply a complete re-acquisition. Actual recovery behavior depends on each collector's implementation and the availability of its persisted state.</p>
+<h2 id="health-and-readiness">Health and Readiness<a class="headerlink" href="#health-and-readiness" title="Permanent link">&para;</a></h2>
+<p>The service provides common liveness checks and independent readiness checks for supported ingestion profiles.</p>
+<table>
+<thead>
+<tr>
+<th>Endpoint</th>
+<th>Purpose</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><code>GET /health/live</code></td>
+<td>Application liveness</td>
+</tr>
+<tr>
+<td><code>GET /health/ready</code></td>
+<td>UC1 configuration and storage readiness</td>
+</tr>
+<tr>
+<td><code>GET /health/ready/coastal-uc3-sentinel2</code></td>
+<td>UC3 package, configuration, and storage readiness</td>
+</tr>
+</tbody>
+</table>
+<p>Profile-specific readiness checks validate the dependencies required for that profile without triggering collection operations.</p>
+<p>A failure in one profile's readiness does not necessarily indicate that other profiles are unavailable.</p>
+<h2 id="current-operational-limits">Current Operational Limits<a class="headerlink" href="#current-operational-limits" title="Permanent link">&para;</a></h2>
+<ul>
+<li>Ingestion requests are synchronous from the HTTP client's perspective and remain subject to client, reverse-proxy, and server timeouts.</li>
+<li>Collector execution occurs in worker threads to avoid blocking the FastAPI event loop.</li>
+<li>Concurrent execution guards operate within individual application processes.</li>
+<li>Multiple application replicas do not share a distributed execution lock.</li>
+<li>The deployment expects required external services, including MongoDB and MinIO, to be accessible through the configured infrastructure.</li>
+<li>There is currently no centralised background job queue or persistent job polling mechanism.</li>
+<li>The application does not introduce its own dedicated authentication and authorisation mechanism for ingestion requests; access control must be enforced at the deployment boundary.</li>
+</ul>
+<h2 id="extensibility">Extensibility<a class="headerlink" href="#extensibility" title="Permanent link">&para;</a></h2>
+<p>The architecture is designed to accommodate additional ingestion profiles without restructuring the application.</p>
+<p>Integrating a new collector generally involves:</p>
+<ol>
+<li>Defining its request validation requirements.</li>
+<li>Implementing an adapter for the collector's execution contract.</li>
+<li>Registering the profile in the application dispatcher.</li>
+<li>Configuring its dependencies and storage access.</li>
+<li>Adding profile-specific readiness checks and integration tests.</li>
+</ol>
+<p>This maintains a consistent API while allowing different ingestion implementations, data providers, processing pipelines, and storage models to coexist within the same service.</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+  <footer class="custom-footer">
+    <div class="footer-content">
+      <img src="../images/EN-Funded-by-the-EU-POS-7.png" alt="EU logo" class="footer-logo" />
+      <p class="footer-text">
+        This project has received funding from the European Union's Horizon Europe research and innovation programme under grant agreement No 101189962.
+      </p>
+
+      <div class="footer-social-icons">
+        
+          <a href="https://github.com/terra-horizon" target="_blank" rel="noopener">
+            <span class="icon">
+              <i class="fab fa-github"></i>
+            </span>
+          </a>
+        
+          <a href="https://x.com/horizon_terra" target="_blank" rel="noopener">
+            <span class="icon">
+              <i class="fab fa-x-twitter"></i>
+            </span>
+          </a>
+        
+          <a href="https://www.youtube.com/@TERRAHORIZON" target="_blank" rel="noopener">
+            <span class="icon">
+              <i class="fab fa-youtube"></i>
+            </span>
+          </a>
+        
+          <a href="https://www.linkedin.com/company/terra-horizon" target="_blank" rel="noopener">
+            <span class="icon">
+              <i class="fab fa-linkedin"></i>
+            </span>
+          </a>
+        
+      </div>
+    </div>
+  </footer>
+
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.path", "navigation.top"], "search": "../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"alias": true, "default": "latest", "provider": "mike"}}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.d7400e89.min.js"></script>
+      
+    
+  </body>
+</html>
