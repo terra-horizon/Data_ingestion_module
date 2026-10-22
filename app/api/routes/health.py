@@ -1,8 +1,9 @@
 from fastapi import APIRouter, Response, status
 from starlette.concurrency import run_in_threadpool
 
-from app.schemas.health import LivenessResponse, ReadinessResponse
+from app.schemas.health import LivenessResponse, ReadinessResponse, Uc3ReadinessResponse
 from app.services.health import check_readiness
+from app.services.uc3_health import check_uc3_readiness
 
 
 router = APIRouter(prefix="/health", tags=["health"])
@@ -20,6 +21,18 @@ async def live() -> LivenessResponse:
 )
 async def ready(response: Response) -> ReadinessResponse:
     result = await run_in_threadpool(check_readiness)
+    if result.status == "not_ready":
+        response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+    return result
+
+
+@router.get(
+    "/ready/coastal-uc3-sentinel2",
+    response_model=Uc3ReadinessResponse,
+    responses={503: {"model": Uc3ReadinessResponse}},
+)
+async def uc3_ready(response: Response) -> Uc3ReadinessResponse:
+    result = await run_in_threadpool(check_uc3_readiness)
     if result.status == "not_ready":
         response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
     return result

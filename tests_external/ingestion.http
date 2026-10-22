@@ -1,4 +1,4 @@
-@baseUrl = http://127.0.0.1:8000
+@baseUrl = http://127.0.0.1:18000
 
 ### Run Sentinel-2 ingestion for Sperchios
 POST {{baseUrl}}/api/ingestion/run
@@ -18,7 +18,7 @@ Accept: application/json
     38.894223
   ],
   "run_name": "sperchios",
-  "history_start": "2016-01-01",
+  "history_start": "2026-10-10",
   "mode": "auto",
   "max_days_per_run": 1,
   "max_tiles_per_run": 1

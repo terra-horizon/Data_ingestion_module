@@ -9,6 +9,10 @@ from pymongo.errors import PyMongoError
 
 from app.schemas.health import ReadinessChecks, ReadinessResponse
 
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 def check_readiness() -> ReadinessResponse:
     """Check required storage configuration and connectivity without writing data."""
@@ -17,6 +21,7 @@ def check_readiness() -> ReadinessResponse:
         settings = CollectorStorageSettings.from_env(aoi_id="health-check")
         get_credential_sets()
     except (StorageConfigurationError, RuntimeError):
+        logger.exception("UC1 configuration readiness failed")
         return ReadinessResponse(
             status="not_ready",
             checks=ReadinessChecks(
