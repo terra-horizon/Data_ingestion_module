@@ -6,7 +6,11 @@ GET {{baseUrl}}/health/live
 Accept: application/json
 
 ### Readiness: validates configuration, MongoDB, and MinIO connectivity
-GET {{baseUrl}}/health/ready/
+GET {{baseUrl}}/health/ready
+Accept: application/json
+
+### UC3 readiness: checks package, UC3 configuration, MongoDB, and MinIO
+GET {{baseUrl}}/health/ready/coastal-uc3-sentinel2
 Accept: application/json
 
 ### Live health check for the ingestion service
@@ -17,3 +21,9 @@ Accept: application/json
 ### Live readiness check for the ingestion service
 GET {{productionUrl}}/health/ready
 Content-Type: application/json
+Accept: application/json
+
+### UC3 readiness check for the ingestion service
+GET {{productionUrl}}/health/ready/coastal-uc3-sentinel2
+Content-Type: application/json
+Accept: application/json

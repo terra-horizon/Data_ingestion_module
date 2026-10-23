@@ -1,4 +1,5 @@
 @baseUrl = http://127.0.0.1:18000
+@productionUrl = https://server.iprism.eu/data-ingestion
 
 ### UC3 readiness (read-only)
 GET {{baseUrl}}/health/ready/coastal-uc3-sentinel2
@@ -26,6 +27,38 @@ Accept: application/json
     "mode": "latest",
     "time_from": "2026-09-08T00:00:00Z",
     "time_to": "2026-10-08T00:00:00Z",
+    "selection_policy": "uc3_parity_pilot",
+    "max_scenes": 1
+  }
+}
+
+### UC3 readiness on the live server (read-only)
+GET {{productionUrl}}/health/ready/coastal-uc3-sentinel2
+Accept: application/json
+
+### LIVE UC3 acquisition: performs a real CDSE query and may publish to production storage
+### Confirm the date window and production authorization before sending this request.
+POST {{productionUrl}}/api/ingestion/run
+Content-Type: application/json
+Accept: application/json
+
+{
+  "run_job_id": "uc3-collect:aoi_02:2026-10-22T00:00:00Z:attempt-1",
+  "triggered_at": "2026-10-22T00:00:00Z",
+  "provider": "sentinel-2",
+  "profile": "coastal-uc3-sentinel2",
+  "aoi_id": "aoi_02",
+  "bbox": [
+    -2.84437,
+    56.39264,
+    -2.78475,
+    56.43782
+  ],
+  "uc3": {
+    "contract_version": 2,
+    "mode": "latest",
+    "time_from": "2026-09-22T00:00:00Z",
+    "time_to": "2026-10-22T00:00:00Z",
     "selection_policy": "uc3_parity_pilot",
     "max_scenes": 1
   }
