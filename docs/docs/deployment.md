@@ -17,7 +17,7 @@ Install and run:
 
 ```bash
 python -m venv .venv
-python -m pip install vendor/terra_wp2_uc3_ingestion-0.5.1-py3-none-any.whl -e ".[test]"
+python -m pip install vendor/terra_wp2_uc3_ingestion-0.5.2-py3-none-any.whl -e ".[test]"
 uvicorn app.main:app --reload
 ```
 

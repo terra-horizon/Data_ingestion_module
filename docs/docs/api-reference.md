@@ -195,7 +195,7 @@ The UC3 payload is the package's `wp2_run_response` result. The following is a c
   "collector_result": {
     "schema_version": 2,
     "result_type": "uc3_ingestion_result",
-    "package_version": "0.5.1",
+    "package_version": "0.5.2",
     "profile": "coastal-uc3-sentinel2",
     "request_id": "uc3req_0f610d29f7c25189afd117bb7fc9652e",
     "correlation_id": "example-airflow-run",

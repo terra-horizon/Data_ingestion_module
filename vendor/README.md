@@ -8,19 +8,6 @@ The package's source code and compiled wheel are not publicly available and are 
 
 This project integrates the UC3 package as an external dependency but **does not claim ownership or responsibility for its development, maintenance, or distribution**.
 
-## Installation
-
-Before installing the application or building its Docker image, the following wheel must be supplied in this directory:
-
-```text
-vendor/
-└── terra_wp2_uc3_ingestion-0.5.1-py3-none-any.whl
-```
-
-The wheel is intentionally excluded from version control through `.gitignore`.
-
-The package must be built from an authorised copy of the UC3 source repository or provided directly by its maintainers.
-
 ## Documentation
 
 For package installation, Docker integration, configuration, validation, and upgrade instructions, refer to:
