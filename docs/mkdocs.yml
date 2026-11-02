@@ -17,6 +17,7 @@ nav:
     - Deployment: deployment.md
     - Configuration: configuration.md
     - UC3 Integration: uc3-integration.md
+    - Hydro Modeling Integration: hydro-modeling-integration.md
     - Quality Assurance: qa.md
     - Pipeline Test Scenarios: pipeline-test-scenarios.md
   - Operations:

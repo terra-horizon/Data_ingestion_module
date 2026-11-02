@@ -274,3 +274,23 @@ Messages are sanitized for adapter execution failures. Validation messages may c
 - The UC3 package must be installed in the runtime image and its server-side `UC3_INGEST_*` settings must be configured.
 
 See [UC3 Integration Documentation](uc3-integration.md) for package installation, environment setup, and manual execution guidance.
+
+## Hydro Modeling delegated ingestion
+
+The following routes delegate to the external UC1 Hydro Modeling Service. They use an
+independent request schema and a `HYDRO_MODELING_API_KEY` for downstream authentication;
+Hydro performs the data acquisition and persistence.
+
+| Method | Module route | Operation |
+|---|---|---|
+| GET | `/api/hydro-modeling/ecmwf/reanalysis-availability` | Check new ERA5-Land dates for `analysis_area_id`. |
+| POST | `/api/hydro-modeling/ecmwf/reanalysis` | Ingest ERA5-Land for `analysis_area_id` and `action_date`. |
+| POST | `/api/hydro-modeling/ecmwf/local-forecast` | Ingest a local forecast; default `horizon_days` is 15. |
+| POST | `/api/hydro-modeling/ifs` | Ingest IFS wind for `marine_analysis_area_id` and `action_date`; defaults are 6 days and `source: ecmwf`. |
+
+Each successful response has `provider`, `profile`, `status`, `request_id`,
+`downstream_status`, `duration_ms`, and a validated `result` that retains Hydro's
+additional fields. These routes have their own error mapping, including 422 for
+request validation and downstream validation, 502/503 for downstream failures,
+and 504 for timeouts. See [Hydro Modeling integration](hydro-modeling-integration.md)
+for exact paths, request examples, configuration and testing.
