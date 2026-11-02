@@ -4,6 +4,9 @@ For the `coastal-uc3-sentinel2` package, local wheel installation and independen
 settings, see [UC3 integration](uc3-integration.md). Supply its wheel in `vendor/`
 before installing the application or building its Docker image.
 
+For delegated ECMWF/IFS ingestion, see [Hydro Modeling integration](hydro-modeling-integration.md).
+It uses a separate downstream API key and does not use this module's MongoDB credentials.
+
 The FastAPI layer does not maintain the collector package needed for the forecaster. It passes the
 request to the installed collector package, which reads storage and CDSE
 configuration from the process environment. Copy `.env.example` to `.env` and
@@ -25,6 +28,16 @@ never commit the populated file.
 | `CDSE_CLIENT_SECRET` | Yes | Primary CDSE OAuth client secret. |
 | `CDSE_BACKUP_CLIENT_ID`, `CDSE_BACKUP_CLIENT_SECRET` | No | First backup credential pair. |
 | `CDSE_BACKUP_2_*` through `CDSE_BACKUP_9_*` | No | Additional ordered backup pairs. |
+
+Hydro Modeling uses separate downstream settings. They apply only to the four
+delegated routes; UC1/UC3 collector settings above are independent.
+
+| Variable | Required for Hydro routes | Purpose |
+| --- | --- | --- |
+| `HYDRO_MODELING_BASE_URL` | No | Hydro service root; defaults to the server URL in `.env.example`. |
+| `HYDRO_MODELING_API_KEY` | Yes | Downstream `X-API-Key`; never include it in request bodies. |
+| `HYDRO_MODELING_TIMEOUT_SECONDS` | No | Per-read/write timeout in seconds; default 120. |
+| `HYDRO_MODELING_CONNECT_TIMEOUT_SECONDS` | No | Connection timeout in seconds; default 10. |
 
 The database name is taken from `MONGO_URI`; a separate `MONGO_DATABASE` value
 is not used by the collector.

@@ -9,6 +9,11 @@ For the `coastal-uc3-sentinel2` package, local wheel installation and independen
 settings, see [UC3 integration](docs/docs/uc3-integration.md). Supply its wheel in `vendor/`
 before installing the application or building its Docker image.
 
+The [Hydro Modeling integration](docs/docs/hydro-modeling-integration.md) delegates
+ERA5-Land reanalysis, local forecast, and IFS wind ingestion to the external UC1 Hydro
+service. It uses four dedicated `/api/hydro-modeling/` routes and a separate
+`HYDRO_MODELING_API_KEY`; Hydro owns acquisition and persistence.
+
 
 The collector is maintained in the
 [`uc1.forecaster.uth.alpha`](https://github.com/terra-horizon/uc1.forecaster.uth.alpha/tree/main/collector)
