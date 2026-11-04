@@ -41,7 +41,7 @@ Both use cases send `POST /api/ingestion/run` with `Content-Type: application/js
 | `run_job_id` | Non-empty identifier for this run; choose a meaningful new identifier. |
 | `triggered_at` | ISO 8601 timestamp with a timezone, for example `2026-10-29T10:00:00Z`. |
 | `provider` | `sentinel-2`. |
-| `profile` | `forecaster-collector` for UC1 or `coastal-uc3-sentinel2` for UC3. |
+| `profile` | `forecaster-collector`, `uc1-water-pollutants-collector`, `uc1-sperchios-river`, or `uc1-sperchios-sea` for UC1, or `coastal-uc3-sentinel2` for UC3. |
 | `aoi_id` | Identifier of the area to process. |
 | `bbox` | WGS84 coordinates `[min_lon, min_lat, max_lon, max_lat]`, in that order. |
 
@@ -73,7 +73,7 @@ Example body:
 }
 ```
 
-`run_name` is required for UC1. `history_start` defaults to `2016-01-01`, and `target_date` defaults to the current UTC date. `mode` defaults to `auto` and can also be `backfill` or `incremental`. The two limits are optional positive integers; omitting a limit can increase work. The examples in `ingestion.http` show additional combinations, including processing a queued date and omitting the tile limit.
+`run_name` is required for the `forecaster-collector` profile. `history_start` defaults to `2016-01-01`, and `target_date` defaults to the current UTC date. `mode` defaults to `auto` and can also be `backfill` or `incremental`. The two limits are optional positive integers; omitting a limit can increase work. The examples in `ingestion.http` show additional combinations, including processing a queued date and omitting the tile limit.
 
 ## 5. Run UC3
 
@@ -114,3 +114,17 @@ The HTTP call stays open until the run completes, so allow enough time in the cl
 - **HTTP errors:** `422` indicates an invalid request; `400` can indicate invalid configuration or an unauthorised UC3 AOI; `409` indicates an existing run for the guarded AOI; `503` indicates an unavailable dependency; and `500` indicates an execution error. Inspect the response details.
 
 See the [API reference](../docs/docs/api-reference.md) for the complete request and response contracts.
+
+## 7. Run the UC1 Sperchios delegated profiles
+
+Open [uc1_sperchios.http](uc1_sperchios.http) and select the river or sea request. Set `@baseUrl` to the running service (port `18000` for Compose or normally `8000` for local Uvicorn), and update the run ID and trigger timestamp. Both requests use the existing ingestion endpoint and require only common fields; service URLs, keys and static analysis IDs come from the server environment. Ensure the running process has received the updated environment; restart it if needed.
+
+The satellite request submits a real collection job. Independently, the river profile retrieves the static river analysis, runs reanalysis and then a 15-day forecast; the sea profile looks up the configured marine analysis and runs a six-day IFS ingestion. Downstream action dates and the satellite job ID use the current UTC date. The collector run ID combines the UTC date with a stable hash of the overall run ID. Reusing that overall ID on the same date repeats the collector ID; duplicate handling depends on the collector.
+
+Inspect `status` and `collector_result`. A satellite response with `status: queued` does not mean collection has finished. A later Hydro Modeling failure returns `partial` with completed responses and an `error` identifying the step. Allow time for downstream calls.
+
+Run mocked tests with `.\.venv\Scripts\python.exe -m pytest tests/test_uc1_profile.py -q`. For local HTTPS testing, obtain a trusted PEM CA bundle from the service operator and set `UC1_HTTP_CA_BUNDLE` in the service process environment; restart the process after changing settings. Verification stays enabled. When using Docker, mount the bundle and configure its container path.
+
+For the production Docker network, configure `UC1_HYDRO_BASE_URL=http://hydro-modeling-service:8000` and `UC1_COLLECTOR_BASE_URL=http://uc1-water-pollutants-collector:8000`. These internal URLs omit external proxy prefixes and require the containers to share the network. Compose loads `.env` on container creation. Validate collector connectivity with a read-only request from the target container before live tests.
+
+The satellite profile accepts `sensor` (`sentinel2`), `mode`, `history_start`, `target_date`, `max_days_per_run`, `max_tiles_per_run`, `discovery_chunk_days`, and `max_cloud_coverage`. Its downstream job ID uses `uc1.collection.water-pollutants_<UTC date>_<hash>`; the hash derives from the overall run ID. Reusing that ID on the same date repeats the downstream ID, but does not guarantee upstream idempotency.
