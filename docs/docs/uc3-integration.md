@@ -49,7 +49,7 @@ The intended shared deployment uses database `terra-db`, collection prefix `uc3_
 }
 ```
 
-The UC3 object requires version 2, `mode` (`latest` or `window`), and an explicit, timezone-aware increasing time window. Offsets are normalised to UTC by the package. `selection_policy` defaults to `uc3_parity_pilot`; the other supported policy is `uc3_monthly_backfill`. `max_scenes` is an integer from 1 to 24; omitted, the current policies use 3. Optional package metadata fields are `project_id`, `request_id`, `registry_version`, and `window_id`. Unknown nested fields are rejected. AOI ID and bbox must match the operator-selected or packaged authorised registry (package tolerance: 0.000001 degrees). They are checked before acquisition. UC3 requires no `run_name`, `history_start`, or `target_date`; those UC1 fields are not forwarded. UC1 still requires `run_name` and retains its existing defaults.
+The UC3 object requires version 2, `mode` (`latest` or `window`), and an explicit, timezone-aware increasing time window. Offsets are normalised to UTC by the package. `selection_policy` defaults to `uc3_parity_pilot`; the other supported policy is `uc3_monthly_backfill`. `max_scenes` is an integer from 1 to 24; omitted, the current policies use 3. Optional package metadata fields are `project_id`, `request_id`, `registry_version`, and `window_id`. Unknown nested fields are rejected. AOI ID and bbox must match the operator-selected or packaged authorised registry (package tolerance: 0.000001 degrees). They are checked before acquisition. UC3 requires no `run_name`, `history_start`, or `target_date`; those UC1 fields are not forwarded. The legacy `forecaster-collector` profile still requires `run_name`; remote collector defaults apply to omitted satellite options.
 
 | Result | HTTP | Meaning |
 | --- | --- | --- |
@@ -68,7 +68,7 @@ Execution is synchronous to the HTTP caller; configure proxy/client timeouts for
 
 ## Readiness and offline tests
 
-`GET /health/ready` retains the UC1 contract. `GET /health/ready/coastal-uc3-sentinel2` independently returns 200 or 503 with `package`, `configuration`, `mongodb`, and `minio` checks (`ok`, `unavailable`, or `skipped`). It imports the package, reads its schema and registry, checks required settings, pings MongoDB, and lists at most one object under the UC3 scene prefix. It performs no writes or CDSE calls. Credential presence does not prove CDSE authentication, and storage reads do not prove write permissions. UC3 readiness failure does not change UC1 readiness.
+`GET /health/ready` checks remote UC1 collector readiness. `GET /health/ready/coastal-uc3-sentinel2` independently returns 200 or 503 with `package`, `configuration`, `mongodb`, and `minio` checks (`ok`, `unavailable`, or `skipped`). It imports the package, reads its schema and registry, checks required settings, pings MongoDB, and lists at most one object under the UC3 scene prefix. It performs no writes or CDSE calls. Credential presence does not prove CDSE authentication, and storage reads do not prove write permissions. UC3 readiness failure does not change UC1 readiness.
 
 ```powershell
 .venv\Scripts\python.exe -m pytest tests/test_uc3_profile.py tests/test_uc3_health.py -q

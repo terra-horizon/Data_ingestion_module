@@ -22,18 +22,9 @@ They verify:
 
 These tests do not contact CDSE, MongoDB, or MinIO.
 
-## Collector package tests
+## Remote collector tests
 
-The collector's unit tests are owned and run in its source repository. This
-repository tests the installed package at the adapter boundary:
-
-```bash
-python -m pip install vendor/terra_wp2_uc3_ingestion-0.5.2-py3-none-any.whl -e ".[test]"
-python -m pytest
-```
-
-The owning collector repository is responsible for its incremental-state,
-discovery-cache, retry, storage-publication, and schema-validation tests.
+The collector service owns its collection and persistence tests. This module mocks its HTTP API and verifies submission, polling, readiness, and error handling. UC3 integration tests use the installed wheel.
 
 ## Manual API test
 
@@ -47,13 +38,7 @@ Start Uvicorn or the Compose service and execute
 }
 ```
 
-Confirm:
-
-1. HTTP status is `200` for `success` or `partial`.
-2. The response echoes `run_job_id`, provider, profile, and AOI.
-3. MongoDB `pipeline_runs` contains the collector run.
-4. Observation/tile/state documents are present under the expected AOI.
-5. MinIO contains stable AOI artifacts and a run-scoped prefix.
+Confirm the top-level status and inspect `collector_result.satellite_submission` and `satellite_collection`. `pending` retains the remote job ID when the wait expires or polling fails. The remote worker owns MongoDB and MinIO persistence.
 
 ## Failure-path checks
 
@@ -63,9 +48,8 @@ Confirm:
 | Timestamp without timezone | HTTP `422`. |
 | Reversed or incomplete bbox | HTTP `422`. |
 | Missing collector environment variable | HTTP `400`. |
-| MongoDB/MinIO unreachable | HTTP `503`. |
-| Concurrent request for same AOI in one API process | HTTP `409`. |
+| Remote collector unreachable before submission | HTTP `503`. |
+| Concurrent UC3 request for same AOI in one API process | HTTP `409`. |
 | Unexpected collector exception | HTTP `500` without a traceback in the response. |
 
-Use container logs and the collector's `pipeline_runs` records for internal
-diagnostics. Public errors intentionally avoid returning tracebacks.
+Use the remote collector's diagnostics for collection failures. Public errors intentionally avoid returning tracebacks.

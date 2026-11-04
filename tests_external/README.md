@@ -1,6 +1,6 @@
 # Manual ingestion requests
 
-This guide explains how to send UC1 and UC3 requests using the examples in this directory. The ingestion endpoint runs synchronously and may call CDSE and write to the configured MongoDB and MinIO. A local URL can still point to production storage if the local service is configured that way; check its settings before sending an ingestion request.
+This guide explains how to send UC1 and UC3 requests using the examples in this directory. The ingestion endpoint runs synchronously; the remote collector and UC3 can access configured external services and storage. A local URL can still point to production storage if the local service is configured that way; check its settings before sending an ingestion request.
 
 ## 1. Choose the service and HTTP client
 
@@ -27,7 +27,7 @@ Alternatively, open `/docs` at the chosen base URL, select an endpoint, choose *
 In [healthChecks.http](healthChecks.http), send the requests for the selected environment:
 
 1. `GET /health/live` checks that the API process responds.
-2. `GET /health/ready` checks UC1 configuration and storage connectivity.
+2. `GET /health/ready` checks the remote collector readiness.
 3. `GET /health/ready/coastal-uc3-sentinel2` checks the UC3 package, configuration and storage connectivity.
 
 Readiness returns HTTP `200` with `status: "ready"` when its checks pass, or `503` with individual check states when they do not. These checks do not start ingestion or write data. Readiness does not prove CDSE authentication, scene availability or storage write permission.
@@ -73,7 +73,7 @@ Example body:
 }
 ```
 
-`run_name` is required for the `forecaster-collector` profile. `history_start` defaults to `2016-01-01`, and `target_date` defaults to the current UTC date. `mode` defaults to `auto` and can also be `backfill` or `incremental`. The two limits are optional positive integers; omitting a limit can increase work. The examples in `ingestion.http` show additional combinations, including processing a queued date and omitting the tile limit.
+`run_name` is required for the compatibility profile but is not forwarded. Omitted satellite options use collector defaults. `mode` can be `auto`, `backfill` or `incremental`. The two limits are optional positive integers; omitting a limit can increase work. The examples in `ingestion.http` show additional combinations, including processing a queued date and omitting the tile limit.
 
 ## 5. Run UC3
 
@@ -107,9 +107,9 @@ The nested `uc3` object requires `contract_version: 2`, `mode` (`latest` or `win
 
 ## 6. Interpret the response
 
-The HTTP call stays open until the run completes, so allow enough time in the client and any proxy. There is no polling endpoint. An HTTP `200` alone does not guarantee that data was acquired.
+The HTTP call stays open until the run completes or polling reaches its limit, so allow enough time in the client and any proxy. There is no polling endpoint. An HTTP `200` alone does not guarantee that data was acquired.
 
-- **UC1:** inspect `status` and `collector_result`; common statuses include `success`, `partial`, and `failed`. Paths in the result may refer to files on the worker rather than downloadable URLs.
+- **UC1:** inspect `status` and `collector_result`; satellite statuses include `success`, `partial`, `failed`, and `pending`. Paths in the result may refer to files on the worker rather than downloadable URLs.
 - **UC3:** inspect `status`, `collector_result.outcome`, `reason`, `error`, `scene_packages`, and `scene_asset_ids`. `completed` indicates an acquisition completed, `no_data` means no suitable data was delivered, and `failed` contains failure details. All three can be returned with HTTP `200`.
 - **HTTP errors:** `422` indicates an invalid request; `400` can indicate invalid configuration or an unauthorised UC3 AOI; `409` indicates an existing run for the guarded AOI; `503` indicates an unavailable dependency; and `500` indicates an execution error. Inspect the response details.
 
@@ -119,12 +119,12 @@ See the [API reference](../docs/docs/api-reference.md) for the complete request 
 
 Open [uc1_sperchios.http](uc1_sperchios.http) and select the river or sea request. Set `@baseUrl` to the running service (port `18000` for Compose or normally `8000` for local Uvicorn), and update the run ID and trigger timestamp. Both requests use the existing ingestion endpoint and require only common fields; service URLs, keys and static analysis IDs come from the server environment. Ensure the running process has received the updated environment; restart it if needed.
 
-The satellite request submits a real collection job. Independently, the river profile retrieves the static river analysis, runs reanalysis and then a 15-day forecast; the sea profile looks up the configured marine analysis and runs a six-day IFS ingestion. Downstream action dates and the satellite job ID use the current UTC date. The collector run ID combines the UTC date with a stable hash of the overall run ID. Reusing that overall ID on the same date repeats the collector ID; duplicate handling depends on the collector.
+The satellite request submits a real collection job. Independently, the river profile retrieves the static river analysis, runs reanalysis and then a 15-day forecast; the sea profile looks up the configured marine analysis and runs a six-day IFS ingestion. Hydro action dates use the current UTC date; the satellite job ID uses the trigger UTC date. The collector run ID combines the UTC date with a stable hash of the overall run ID. Reusing that overall ID and trigger date repeats the collector ID; duplicate handling depends on the collector.
 
-Inspect `status` and `collector_result`. A satellite response with `status: queued` does not mean collection has finished. A later Hydro Modeling failure returns `partial` with completed responses and an `error` identifying the step. Allow time for downstream calls.
+Inspect `status` and `collector_result`. The module polls a queued satellite job; a `pending` result means the job may still be running. A later Hydro Modeling failure returns `partial` with completed responses and an `error` identifying the step. Allow time for downstream calls.
 
 Run mocked tests with `.\.venv\Scripts\python.exe -m pytest tests/test_uc1_profile.py -q`. For local HTTPS testing, obtain a trusted PEM CA bundle from the service operator and set `UC1_HTTP_CA_BUNDLE` in the service process environment; restart the process after changing settings. Verification stays enabled. When using Docker, mount the bundle and configure its container path.
 
 For the production Docker network, configure `UC1_HYDRO_BASE_URL=http://hydro-modeling-service:8000` and `UC1_COLLECTOR_BASE_URL=http://uc1-water-pollutants-collector:8000`. These internal URLs omit external proxy prefixes and require the containers to share the network. Compose loads `.env` on container creation. Validate collector connectivity with a read-only request from the target container before live tests.
 
-The satellite profile accepts `sensor` (`sentinel2`), `mode`, `history_start`, `target_date`, `max_days_per_run`, `max_tiles_per_run`, `discovery_chunk_days`, and `max_cloud_coverage`. Its downstream job ID uses `uc1.collection.water-pollutants_<UTC date>_<hash>`; the hash derives from the overall run ID. Reusing that ID on the same date repeats the downstream ID, but does not guarantee upstream idempotency.
+The satellite profile accepts `sensor` (`sentinel2` or `sentinel3`), `mode`, `history_start`, `target_date`, `max_days_per_run`, `max_tiles_per_run`, `discovery_chunk_days`, and `max_cloud_coverage`. Its downstream job ID uses `uc1.collection.water-pollutants_<trigger UTC date>_<hash>`; the hash derives from the overall run ID. Reusing that ID and trigger date repeats the downstream ID, but does not guarantee upstream idempotency.

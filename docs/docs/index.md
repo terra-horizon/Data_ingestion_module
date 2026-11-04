@@ -2,12 +2,12 @@
 
 The Data Ingestion Module is a Python 3.12+ FastAPI service that exposes registered Sentinel-2 ingestion processes through a validated HTTP API.
 
-It integrates two independently maintained components:
+It integrates the remote UC1 collector and independently maintained UC3 package:
 
-- **UC1 — `forecaster-collector`:** Runs the TERRA UC1 Sentinel-2 collector, installed from a pinned Git revision.
+- **UC1 — `forecaster-collector`:** Compatibility alias for the remote satellite collector.
 - **UC3 — `coastal-uc3-sentinel2`:** Runs the TERRA UC3 ingestion package, supplied as a private Python wheel.
 
-Both profiles use the same API and execution infrastructure while keeping their collector implementations, configuration, and storage responsibilities separate.
+All profiles use the same API and execution infrastructure while keeping service configuration and storage responsibilities separate.
 
 ## Capabilities
 
@@ -23,7 +23,10 @@ Both profiles use the same API and execution infrastructure while keeping their 
 
 | Profile | Workflow |
 |---|---|
-| `forecaster-collector` | Restore UC1 collection state, discover and collect observations, and publish statistical data and artifacts. |
+| `forecaster-collector` | Submit and monitor the remote satellite collection job. |
+| `uc1-water-pollutants-collector` | Submit and monitor a remote satellite collection job. |
+| `uc1-sperchios-river` | Run river reanalysis and forecast through Hydro Modeling. |
+| `uc1-sperchios-sea` | Run marine IFS ingestion through Hydro Modeling. |
 | `coastal-uc3-sentinel2` | Discover Sentinel-2 L2A scenes, assess acquisition quality, retrieve raster imagery, and publish scene metadata and artifacts. |
 
 Requests are synchronous: the API responds after the selected profile finishes. The service does not provide a background job queue or a persisted API-level job model.
@@ -39,4 +42,4 @@ Requests are synchronous: the API responds after the selected profile finishes. 
 
 ## External dependencies
 
-The UC1 collector is installed from its pinned Git revision. The UC3 package is privately distributed and is not included in this repository; supply it through an authorized handoff or private artifact channel. Access, use, modification, and redistribution remain subject to the respective maintainers' permissions and licensing terms.
+The UC1 collector runs as a separate service. The UC3 package is privately distributed and is not included in this repository; supply it through an authorized handoff or private artifact channel. Access, use, modification, and redistribution remain subject to the respective maintainers' permissions and licensing terms.

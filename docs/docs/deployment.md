@@ -8,12 +8,7 @@ For the UC1 river and sea profiles, configure the `UC1_HYDRO_*` settings and sta
 
 ## Local Python process
 
-Requirements:
-
-- Python 3.12+
-- reachable MongoDB and MinIO
-- an existing MinIO bucket
-- valid CDSE client credentials
+Requirements: Python 3.12+, the UC3 wheel, and the selected profile's configured dependencies.
 
 Install and run:
 
@@ -23,12 +18,6 @@ python -m pip install vendor/terra_wp2_uc3_ingestion-0.5.2-py3-none-any.whl -e "
 uvicorn app.main:app --reload
 ```
 
-Installing the application builds and installs only the pinned `collector`
-subdirectory from `terra-horizon/uc1.forecaster.uth.alpha`. Pip may clone the
-source repository into a temporary directory while resolving the Git
-dependency, but no other project directory is installed or retained in this
-application repository.
-
 The API listens on `127.0.0.1:8000` by default. Swagger UI is at `/docs`.
 
 ## Docker image
@@ -36,9 +25,9 @@ The API listens on `127.0.0.1:8000` by default. Swagger UI is at `/docs`.
 The repository Dockerfile:
 
 1. starts from `python:3.12-slim`;
-2. installs Git and CA certificates for the pinned VCS dependency;
+2. installs CA certificates;
 3. copies the FastAPI project;
-4. installs the FastAPI application and its pinned collector dependency;
+4. installs the FastAPI application and UC3 wheel;
 5. starts Uvicorn on `0.0.0.0:8000`.
 
 Build directly:
@@ -80,10 +69,4 @@ not remove MongoDB, MinIO, or their network.
 
 ## Persistent data
 
-MongoDB and MinIO are the durable stores. The current API Compose service does
-not mount `outputs/` as a volume, so local collector staging files disappear
-when its container is replaced. On the next run, the collector hydrates remote
-observations, collection state, and tile artifacts before calculating work.
-
-The collector's CDSE discovery cache is local and is not restored from remote
-storage. It is recreated only when a discovery window actually runs.
+The remote collector and UC3 package manage their respective storage. The API does not maintain UC1 collection state or staging files.
