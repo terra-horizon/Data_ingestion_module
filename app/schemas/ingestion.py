@@ -4,7 +4,7 @@ from typing import Annotated, Any, Literal
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
-IngestionProfile = Literal["forecaster-collector", "coastal-uc3-sentinel2"]
+IngestionProfile = Literal["forecaster-collector", "coastal-uc3-sentinel2", "uc1-sperchios-river", "uc1-sperchios-sea", "uc1-water-pollutants-collector"]
 
 
 class Uc3AcquisitionOptions(BaseModel):
@@ -51,6 +51,10 @@ class IngestionRunRequest(BaseModel):
     max_days_per_run: Annotated[int, Field(gt=0)] | None = None
     max_tiles_per_run: Annotated[int, Field(gt=0)] | None = None
 
+    sensor: Literal["sentinel2"] | None = None
+    discovery_chunk_days: Annotated[int, Field(gt=0)] | None = None
+    max_cloud_coverage: Annotated[float, Field(ge=0, le=100)] | None = None
+
     uc3: Uc3AcquisitionOptions | None = None
 
     @field_validator("triggered_at")
@@ -79,6 +83,10 @@ class IngestionRunRequest(BaseModel):
         elif self.profile == "coastal-uc3-sentinel2" and self.uc3 is None:
             # history_start defaults to 2016-01-01, so UC3 requires an explicit window.
             raise ValueError("coastal-uc3-sentinel2 requires uc3 options with time_from and time_to")
+        if self.profile.startswith("uc1-") and self.uc3 is not None:
+            raise ValueError("uc3 options apply only to the coastal-uc3-sentinel2 profile")
+        if self.profile != "uc1-water-pollutants-collector" and (self.sensor is not None or self.discovery_chunk_days is not None or self.max_cloud_coverage is not None):
+            raise ValueError("satellite collector options apply only to the uc1-water-pollutants-collector profile")
         return self
 
 
