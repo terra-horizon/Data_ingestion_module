@@ -275,22 +275,14 @@ Messages are sanitized for adapter execution failures. Validation messages may c
 
 See [UC3 Integration Documentation](uc3-integration.md) for package installation, environment setup, and manual execution guidance.
 
-## Hydro Modeling delegated ingestion
+## UC1 Sperchios profiles
 
-The following routes delegate to the external UC1 Hydro Modeling Service. They use an
-independent request schema and a `HYDRO_MODELING_API_KEY` for downstream authentication;
-Hydro performs the data acquisition and persistence.
+`POST /api/ingestion/run` accepts `uc1-water-pollutants-collector`, `uc1-sperchios-river` and `uc1-sperchios-sea` with the common fields, for example:
 
-| Method | Module route | Operation |
-|---|---|---|
-| GET | `/api/hydro-modeling/ecmwf/reanalysis-availability` | Check new ERA5-Land dates for `analysis_area_id`. |
-| POST | `/api/hydro-modeling/ecmwf/reanalysis` | Ingest ERA5-Land for `analysis_area_id` and `action_date`. |
-| POST | `/api/hydro-modeling/ecmwf/local-forecast` | Ingest a local forecast; default `horizon_days` is 15. |
-| POST | `/api/hydro-modeling/ifs` | Ingest IFS wind for `marine_analysis_area_id` and `action_date`; defaults are 6 days and `source: ecmwf`. |
+```json
+{"run_job_id":"uc1-sea-001","triggered_at":"2026-11-03T07:00:00Z","provider":"sentinel-2","profile":"uc1-sperchios-sea","aoi_id":"sperchios","bbox":[22.433493,38.837552,22.569555,38.894223]}
+```
 
-Each successful response has `provider`, `profile`, `status`, `request_id`,
-`downstream_status`, `duration_ms`, and a validated `result` that retains Hydro's
-additional fields. These routes have their own error mapping, including 422 for
-request validation and downstream validation, 502/503 for downstream failures,
-and 504 for timeouts. See [Hydro Modeling integration](hydro-modeling-integration.md)
-for exact paths, request examples, configuration and testing.
+The existing response envelope contains `collector_result.status` and full upstream responses: `satellite_collection` for the satellite profile; `static_river_analysis`, `ecmwf_reanalysis`, `ecmwf_local_forecast` for river; and `static_marine_analysis`, `ifs_ingestion` for sea. A `queued` satellite job means submission succeeded, not collection completion. A Hydro Modeling failure after an earlier response returns HTTP 200 with `status: partial`, the completed responses, and an `error` containing `step`, `category`, and `message`. Earlier errors use the existing 400/503/500 error mapping. No automatic POST retries or satellite polling occur.
+
+The satellite profile accepts `sensor` (`sentinel2`), `mode`, `history_start`, `target_date`, `max_days_per_run`, `max_tiles_per_run`, `discovery_chunk_days`, and `max_cloud_coverage`. Its downstream job ID uses `uc1.collection.water-pollutants_<UTC date>_<hash>`, where the hash derives from the overall run ID. Reuse on the same date produces the same ID, but upstream idempotency is not guaranteed.

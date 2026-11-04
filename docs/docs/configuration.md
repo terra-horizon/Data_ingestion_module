@@ -4,9 +4,6 @@ For the `coastal-uc3-sentinel2` package, local wheel installation and independen
 settings, see [UC3 integration](uc3-integration.md). Supply its wheel in `vendor/`
 before installing the application or building its Docker image.
 
-For delegated ECMWF/IFS ingestion, see [Hydro Modeling integration](hydro-modeling-integration.md).
-It uses a separate downstream API key and does not use this module's MongoDB credentials.
-
 The FastAPI layer does not maintain the collector package needed for the forecaster. It passes the
 request to the installed collector package, which reads storage and CDSE
 configuration from the process environment. Copy `.env.example` to `.env` and
@@ -28,16 +25,6 @@ never commit the populated file.
 | `CDSE_CLIENT_SECRET` | Yes | Primary CDSE OAuth client secret. |
 | `CDSE_BACKUP_CLIENT_ID`, `CDSE_BACKUP_CLIENT_SECRET` | No | First backup credential pair. |
 | `CDSE_BACKUP_2_*` through `CDSE_BACKUP_9_*` | No | Additional ordered backup pairs. |
-
-Hydro Modeling uses separate downstream settings. They apply only to the four
-delegated routes; UC1/UC3 collector settings above are independent.
-
-| Variable | Required for Hydro routes | Purpose |
-| --- | --- | --- |
-| `HYDRO_MODELING_BASE_URL` | No | Hydro service root; defaults to the server URL in `.env.example`. |
-| `HYDRO_MODELING_API_KEY` | Yes | Downstream `X-API-Key`; never include it in request bodies. |
-| `HYDRO_MODELING_TIMEOUT_SECONDS` | No | Per-read/write timeout in seconds; default 120. |
-| `HYDRO_MODELING_CONNECT_TIMEOUT_SECONDS` | No | Connection timeout in seconds; default 10. |
 
 The database name is taken from `MONGO_URI`; a separate `MONGO_DATABASE` value
 is not used by the collector.
@@ -75,3 +62,18 @@ docker compose up -d --force-recreate
 ```
 
 Use `--build` only after Dockerfile, dependency, or application-source changes.
+
+## UC1 Sperchios delegated profiles
+
+Inject these environment variables into the application process (see `.env.example`):
+
+- `UC1_COLLECTOR_BASE_URL`, `UC1_COLLECTOR_API_KEY`: satellite service URL including its `/terra/use-case-1/water-pollutants-collector` prefix and API key.
+- `UC1_HYDRO_BASE_URL`, `UC1_HYDRO_API_KEY`: Hydro Modeling URL including its `/terra/use-case-1/hydro-modeling-service` prefix and API key. Both services receive `X-API-Key`.
+- `UC1_SPERCHIOS_ANALYSIS_AREA_ID`: static river ID, required by both Hydro Modeling profiles.
+- `UC1_SPERCHIOS_MARINE_ANALYSIS_AREA_ID`: static marine ID, required by the sea profile.
+- `UC1_RIVER_FORECAST_HORIZON_DAYS=15` and `UC1_IFS_FORECAST_HORIZON_DAYS=6`: fixed values; other values are rejected.
+- `UC1_HTTP_CONNECT_TIMEOUT_SECONDS=10` and `UC1_HTTP_READ_TIMEOUT_SECONDS=120`: positive HTTP timeouts.
+
+Only the selected profile?s service configuration is required. Configuration is validated before requests. The service uses the configured river ID to find the static analysis and checks the configured marine ID against the filtered list; it never creates analyses. Run `python -m pytest tests/test_uc1_profile.py` for mocked local integration tests.
+
+`UC1_HTTP_CA_BUNDLE` optionally points to a readable PEM trust bundle for the UC1 HTTP client. It supplies that client's trusted roots and leaves certificate and hostname verification enabled. If omitted, HTTPX uses its default trust configuration. When running in a container, use a path inside the container. See the [manual testing guide](../../tests_external/README.md).

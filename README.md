@@ -9,11 +9,6 @@ For the `coastal-uc3-sentinel2` package, local wheel installation and independen
 settings, see [UC3 integration](docs/docs/uc3-integration.md). Supply its wheel in `vendor/`
 before installing the application or building its Docker image.
 
-The [Hydro Modeling integration](docs/docs/hydro-modeling-integration.md) delegates
-ERA5-Land reanalysis, local forecast, and IFS wind ingestion to the external UC1 Hydro
-service. It uses four dedicated `/api/hydro-modeling/` routes and a separate
-`HYDRO_MODELING_API_KEY`; Hydro owns acquisition and persistence.
-
 
 The collector is maintained in the
 [`uc1.forecaster.uth.alpha`](https://github.com/terra-horizon/uc1.forecaster.uth.alpha/tree/main/collector)
@@ -141,3 +136,15 @@ Detailed architecture, API, configuration, deployment, workflow, and QA guides a
 
 - **Local:** `docs/docs/` - Build with MkDocs when documentation tooling is installed
 - **Online:** [Data_ingestion_module/latest](https://terra-horizon.github.io/Data_ingestion_module/latest/)
+
+### UC1 Sperchios delegated profiles
+
+`uc1-water-pollutants-collector`, `uc1-sperchios-river` and `uc1-sperchios-sea` run through the same `POST /api/ingestion/run` endpoint. Supply the common request fields; none requires `run_name` or `uc3` options. For example, change `profile` among the three names:
+
+```json
+{"run_job_id":"uc1-river-001","triggered_at":"2026-11-03T07:00:00Z","provider":"sentinel-2","profile":"uc1-sperchios-river","aoi_id":"sperchios","bbox":[22.433493,38.837552,22.569555,38.894223]}
+```
+
+Set the `UC1_*` environment variables in `.env.example` in the application process. The base URLs include the collector and Hydro Modeling service prefixes; configure the static river and marine IDs from the respective service. The satellite profile submits a collection job. Independently, the river profile retrieves the configured river analysis, then runs reanalysis and a 15-day local forecast. The sea profile finds the configured marine analysis for the river, then runs a six-day ECMWF IFS ingestion. Steps run sequentially; Hydro Modeling owns persistence.
+
+The satellite response is a job submission (`202`), not proof of completed collection; the workflow does not poll it. Successful upstream bodies are retained under `collector_result`. A later Hydro Modeling failure stops its sequence and returns HTTP 200 with `status: partial`, completed responses and an `error` with the failed step and category. Initial configuration, availability and execution failures use the existing 400, 503 and 500 error responses. Secrets echoed by upstream services are redacted. Run offline tests with `.venv\Scripts\python.exe -m pytest tests/test_uc1_profile.py` (or `python -m pytest` for the full suite).

@@ -34,7 +34,6 @@ Requests are synchronous: the API responds after the selected profile finishes. 
 - [API Reference](api-reference.md) — Endpoints, request schemas, responses, and errors.
 - [Ingestion Workflow](workflow.md) — Request validation, profile execution, acquisition, and publication.
 - [UC3 Integration](uc3-integration.md) — Private wheel installation, configuration, Docker deployment, and verification.
-- [Hydro Modeling Integration](hydro-modeling-integration.md) — Delegated ECMWF/IFS ingestion through four dedicated routes.
 - [Quality Assurance](qa.md) — Automated and manual test guidance.
 - [Deployment](deployment.md) and [Configuration](configuration.md) — Runtime setup and service settings.
 

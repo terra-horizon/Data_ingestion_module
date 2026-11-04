@@ -315,3 +315,8 @@ The UC3 ingestion functionality depends on `terra-wp2-uc3-ingestion`, a privatel
 The package is not publicly distributed or included in this repository. An authorised package artifact must be obtained from its maintainers or through an approved distribution channel before installation or deployment.
 
 This documentation describes the integration of the external UC3 component into the Data Ingestion Module. It does not claim ownership of the external package or grant redistribution rights. Package usage, modification, and redistribution remain subject to the applicable licence and permissions established by its maintainers.
+## UC1 Sperchios delegated workflows
+
+`uc1-water-pollutants-collector`, `uc1-sperchios-river` and `uc1-sperchios-sea` use the common request fields through the existing dispatcher. The satellite profile only submits a collection job. The river sequence is configured river analysis lookup, ECMWF reanalysis, then 15-day local forecast. The sea sequence is marine analyses lookup filtered by configured river ID, then six-day ECMWF IFS ingestion. The profiles execute independently. The configured marine ID must match exactly one returned analysis. The Hydro Modeling service persists its own results.
+
+A satellite HTTP 202 confirms submission only; no completion polling is performed. A later Hydro Modeling failure stops dependent steps and returns a `partial` result with completed responses and a sanitized error. The UTC date determines the satellite job ID and action dates. Configure service URLs, keys, static IDs and timeouts using the `UC1_*` variables described in configuration.

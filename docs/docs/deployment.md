@@ -4,10 +4,7 @@ For the `coastal-uc3-sentinel2` package, local wheel installation and independen
 settings, see [UC3 integration](uc3-integration.md). Supply its wheel in `vendor/`
 before installing the application or building its Docker image.
 
-For delegated ECMWF/IFS ingestion, add `HYDRO_MODELING_API_KEY` to the private
-container environment and configure the Hydro base URL and timeouts as needed. The
-module forwards requests to Hydro over verified TLS; Hydro owns its data storage.
-See [Hydro Modeling integration](hydro-modeling-integration.md) for the four routes.
+For the UC1 river and sea profiles, configure the `UC1_HYDRO_*` settings and static IDs described in [Configuration](configuration.md). Hydro owns its data storage.
 
 ## Local Python process
 
