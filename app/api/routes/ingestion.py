@@ -3,7 +3,7 @@ from time import perf_counter
 
 from fastapi import APIRouter, HTTPException, status
 
-from app.adapters.collector import (
+from app.adapters.common import (
     CollectorAlreadyRunningError,
     CollectorConfigurationError,
     CollectorExecutionError,

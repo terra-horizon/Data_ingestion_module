@@ -29,83 +29,25 @@ async def client():
 
 
 @pytest.mark.asyncio
-async def test_run_ingestion_returns_success(monkeypatch, client: httpx.AsyncClient) -> None:
-    result = {
-        "status": "success",
-        "new_record_count": 2,
-        "collected_dates": ["2026-08-10"],
-        "failed_units": [],
-        "latest_available_observation": "2026-08-10",
-        "run_summary": "Collected two records.",
-    }
-    collector_result = Mock()
-    collector_result.to_dict.return_value = result
-    collector = Mock(return_value=collector_result)
-    monkeypatch.setattr("app.adapters.collector.collect", collector)
-
-    request_body = {**VALID_REQUEST, "history_start": "2026-07-01"}
-    response = await client.post("/api/ingestion/run", json=request_body)
-
+async def test_legacy_ingestion_uses_remote_adapter(monkeypatch, client):
+    calls = []
+    for key, value in {"UC1_COLLECTOR_BASE_URL": "https://collector.test", "UC1_COLLECTOR_API_KEY": "test-key"}.items():
+        monkeypatch.setenv(key, value)
+    def upstream(self, method, url, **kwargs):
+        calls.append((method, url, kwargs))
+        if method == "POST":
+            return httpx.Response(202, json={"job_id": "job", "status": "queued"})
+        return httpx.Response(200, json={"job_id": "job", "status": "succeeded", "result": {"data": 2}})
+    monkeypatch.setattr(httpx.Client, "request", upstream)
+    response = await client.post("/api/ingestion/run", json=VALID_REQUEST)
     assert response.status_code == 200
     body = response.json()
-    assert body["run_job_id"] == "job-sperchios-001"
-    assert body["provider"] == "sentinel-2"
-    assert body["profile"] == "forecaster-collector"
-    assert body["aoi_id"] == "sperchios"
-    assert body["triggered_at"] == "2026-08-11T10:00:00+03:00"
-    assert body["status"] == "success"
-    assert body["duration_ms"] >= 0
-    assert body["started_at"]
-    assert body["completed_at"]
-    assert body["collector_result"] == result
-    collector.assert_called_once()
-    collection_request = collector.call_args.args[0]
-    assert collection_request.aoi_id == "sperchios"
-    assert collection_request.aoi_bbox == VALID_REQUEST["bbox"]
-    assert collection_request.history_start == "2026-07-01"
-    assert collection_request.publish is True
-
-
-@pytest.mark.asyncio
-async def test_run_ingestion_preserves_partial_result(monkeypatch, client: httpx.AsyncClient) -> None:
-    failed_units = [{"tile_id": "tile-1", "retryable": True}]
-    result = {
-        "status": "partial",
-        "new_record_count": 1,
-        "collected_dates": ["2026-08-10"],
-        "failed_units": failed_units,
-        "run_summary": "One unit remains retryable.",
-    }
-    collector_result = Mock()
-    collector_result.to_dict.return_value = result
-    monkeypatch.setattr("app.adapters.collector.collect", Mock(return_value=collector_result))
-
-    response = await client.post("/api/ingestion/run", json=VALID_REQUEST)
-
-    assert response.status_code == 200
-    assert response.json()["status"] == "partial"
-    assert response.json()["collector_result"]["failed_units"] == failed_units
-
-
-@pytest.mark.asyncio
-async def test_run_ingestion_returns_controlled_collector_error(
-    monkeypatch,
-    client: httpx.AsyncClient,
-) -> None:
-    collector = Mock(side_effect=RuntimeError("private storage details"))
-    monkeypatch.setattr("app.adapters.collector.collect", collector)
-
-    response = await client.post("/api/ingestion/run", json=VALID_REQUEST)
-
-    assert response.status_code == 500
-    assert response.json() == {
-        "detail": {
-            "code": "collector_execution_error",
-            "message": "Collector execution failed.",
-            "run_job_id": "job-sperchios-001",
-        }
-    }
-    assert "Traceback" not in response.text
+    assert body["profile"] == "forecaster-collector" and body["status"] == "success"
+    assert body["collector_result"]["satellite_collection"]["result"] == {"data": 2}
+    assert [call[0] for call in calls] == ["POST", "GET"]
+    assert "run_name" not in calls[0][2]["json"]
+    assert calls[0][2]["headers"]["X-API-Key"] == "test-key"
+    assert body["started_at"] and body["completed_at"] and body["duration_ms"] >= 0
 
 
 @pytest.mark.asyncio

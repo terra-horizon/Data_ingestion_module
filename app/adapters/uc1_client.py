@@ -5,7 +5,7 @@ import ssl
 from dataclasses import dataclass
 from urllib.parse import urlsplit
 import httpx
-from app.adapters.collector import CollectorConfigurationError, CollectorExecutionError, CollectorUnavailableError
+from app.adapters.common import CollectorConfigurationError, CollectorExecutionError, CollectorUnavailableError
 
 @dataclass(frozen=True)
 class Settings:
@@ -18,6 +18,8 @@ class Settings:
     connect_timeout: float
     read_timeout: float
     ca_bundle: str | None = None
+    poll_interval: float = 10
+    max_wait: float = 1800
 
     @classmethod
     def from_env(cls, profile: str) -> "Settings":
@@ -49,16 +51,20 @@ class Settings:
             read = float(os.getenv("UC1_HTTP_READ_TIMEOUT_SECONDS", "120"))
             if not all(math.isfinite(x) and x > 0 for x in (connect, read)):
                 raise ValueError
+            poll_interval = float(os.getenv("UC1_COLLECTOR_POLL_INTERVAL_SECONDS", "10")) if satellite else 10
+            max_wait = float(os.getenv("UC1_COLLECTOR_MAX_WAIT_SECONDS", "1800")) if satellite else 1800
+            if not all(math.isfinite(x) and x > 0 for x in (poll_interval, max_wait)):
+                raise ValueError
             if (profile == "river" and int(os.getenv("UC1_RIVER_FORECAST_HORIZON_DAYS", "15")) != 15) or (profile == "sea" and int(os.getenv("UC1_IFS_FORECAST_HORIZON_DAYS", "6")) != 6):
                 raise ValueError
         except ValueError as exc:
             raise CollectorConfigurationError("UC1 timeout or fixed forecast horizon configuration is invalid.") from exc
         return cls(collector_url, required("UC1_COLLECTOR_API_KEY") if satellite else "", hydro_url,
                    "" if satellite else required("UC1_HYDRO_API_KEY"), river_id, marine_id, connect, read,
-                   os.getenv("UC1_HTTP_CA_BUNDLE", "").strip() or None)
+                   os.getenv("UC1_HTTP_CA_BUNDLE", "").strip() or None, poll_interval, max_wait)
 
 class UC1Client:
-    def __init__(self, settings):
+    def __init__(self, settings, *, timeout_cap=None):
         self.settings = settings
         verify = True
         if settings.ca_bundle:
@@ -66,18 +72,21 @@ class UC1Client:
                 verify = ssl.create_default_context(cafile=settings.ca_bundle)
             except (OSError, ValueError) as exc:
                 raise CollectorConfigurationError("UC1 CA bundle could not be loaded.") from exc
-        self.client = httpx.Client(verify=verify, timeout=httpx.Timeout(connect=settings.connect_timeout, read=settings.read_timeout,
-                                                          write=settings.read_timeout, pool=settings.connect_timeout))
+        connect = min(settings.connect_timeout, timeout_cap) if timeout_cap else settings.connect_timeout
+        read = min(settings.read_timeout, timeout_cap) if timeout_cap else settings.read_timeout
+        self.client = httpx.Client(verify=verify, timeout=httpx.Timeout(connect=connect, read=read, write=read, pool=connect))
     def __enter__(self):
         return self
     def __exit__(self, *args):
         self.client.close()
-    def request(self, service, method, path, *, payload=None, params=None, expected=None):
+    def request(self, service, method, path, *, payload=None, params=None, expected=None, timeout=None):
         base = self.settings.collector_url if service == "Satellite collector" else self.settings.hydro_url
         key = self.settings.collector_key if service == "Satellite collector" else self.settings.hydro_key
         try:
-            response = self.client.request(method, base + path, json=payload, params=params,
-                                           headers={"X-API-Key": key, "Accept": "application/json"})
+            kwargs = {"json": payload, "params": params, "headers": {"X-API-Key": key, "Accept": "application/json"}}
+            if timeout is not None:
+                kwargs["timeout"] = timeout
+            response = self.client.request(method, base + path, **kwargs)
         except httpx.TimeoutException as exc:
             raise CollectorUnavailableError(f"{service} request timed out.") from exc
         except httpx.TransportError as exc:

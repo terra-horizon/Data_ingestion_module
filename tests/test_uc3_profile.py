@@ -112,9 +112,7 @@ async def test_profile_specific_validation(client, invalid):
 
 
 async def test_uc1_requests_are_unchanged(monkeypatch, client):
-    result = Mock()
-    result.to_dict.return_value = {"status": "success"}
-    monkeypatch.setattr("app.adapters.collector.collect", Mock(return_value=result))
+    monkeypatch.setitem(__import__("app.services.ingestion", fromlist=["PROFILE_RUNNERS"]).PROFILE_RUNNERS, "forecaster-collector", Mock(return_value={"status": "success"}))
     response = await client.post("/api/ingestion/run", json=UC1_REQUEST)
     assert response.status_code == 200 and response.json()["status"] == "success"
 
@@ -234,9 +232,7 @@ async def test_missing_package_returns_503_without_disabling_uc1(monkeypatch, cl
     response = await client.post("/api/ingestion/run", json=UC3_REQUEST)
     assert response.status_code == 503
     assert "private installation detail" not in response.text
-    result = Mock()
-    result.to_dict.return_value = {"status": "success"}
-    monkeypatch.setattr("app.adapters.collector.collect", Mock(return_value=result))
+    monkeypatch.setitem(__import__("app.services.ingestion", fromlist=["PROFILE_RUNNERS"]).PROFILE_RUNNERS, "forecaster-collector", Mock(return_value={"status": "success"}))
     assert (await client.post("/api/ingestion/run", json=UC1_REQUEST)).status_code == 200
 
 

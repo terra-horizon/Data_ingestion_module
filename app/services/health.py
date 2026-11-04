@@ -1,58 +1,21 @@
-from botocore.exceptions import BotoCoreError, ClientError, EndpointConnectionError
-from data_collection.credentials import get_credential_sets, load_local_env_if_present
-from data_collection.remote_storage import (
-    CollectorStorageSettings,
-    CollectorStore,
-    StorageConfigurationError,
-)
-from pymongo.errors import PyMongoError
-
+"""Read-only readiness of the delegated satellite collector."""
+from app.adapters.common import CollectorAdapterError
+from app.adapters.uc1_client import Settings, UC1Client
 from app.schemas.health import ReadinessChecks, ReadinessResponse
-
-import logging
-
-logger = logging.getLogger(__name__)
 
 
 def check_readiness() -> ReadinessResponse:
-    """Check required storage configuration and connectivity without writing data."""
     try:
-        load_local_env_if_present()
-        settings = CollectorStorageSettings.from_env(aoi_id="health-check")
-        get_credential_sets()
-    except (StorageConfigurationError, RuntimeError):
-        logger.exception("UC1 configuration readiness failed")
-        return ReadinessResponse(
-            status="not_ready",
-            checks=ReadinessChecks(
-                configuration="unavailable",
-                mongodb="skipped",
-                minio="skipped",
-            ),
-        )
-
-    store = CollectorStore(settings)
-    mongo_status = "ok"
-    minio_status = "ok"
+        settings = Settings.from_env("satellite")
+    except CollectorAdapterError:
+        return ReadinessResponse(status="not_ready", checks=ReadinessChecks(configuration="unavailable", collector="skipped"))
     try:
-        try:
-            store.database.command("ping")
-        except (PyMongoError, ValueError, OSError):
-            mongo_status = "unavailable"
-
-        try:
-            store.s3.head_bucket(Bucket=settings.minio_bucket)
-        except (BotoCoreError, ClientError, EndpointConnectionError, ValueError, OSError):
-            minio_status = "unavailable"
-    finally:
-        store.close()
-
-    ready = mongo_status == "ok" and minio_status == "ok"
-    return ReadinessResponse(
-        status="ready" if ready else "not_ready",
-        checks=ReadinessChecks(
-            configuration="ok",
-            mongodb=mongo_status,
-            minio=minio_status,
-        ),
-    )
+        with UC1Client(settings, timeout_cap=5) as client:
+            body = client.request("Satellite collector", "GET", "/health/ready")
+        checks = body.get("checks") if isinstance(body, dict) else None
+        ready = (isinstance(checks, dict) and body.get("status") == "ready"
+                 and all(checks.get(name) == "ok" for name in ("configuration", "mongodb", "minio", "worker")))
+    except CollectorAdapterError:
+        ready = False
+    return ReadinessResponse(status="ready" if ready else "not_ready", checks=ReadinessChecks(
+        configuration="ok", collector="ok" if ready else "unavailable"))

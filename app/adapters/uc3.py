@@ -2,7 +2,7 @@
 
 from typing import Any, Mapping
 
-from app.adapters.collector import (
+from app.adapters.common import (
     CollectorAlreadyRunningError,
     CollectorConfigurationError,
     CollectorExecutionError,

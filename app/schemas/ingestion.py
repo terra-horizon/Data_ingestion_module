@@ -51,7 +51,7 @@ class IngestionRunRequest(BaseModel):
     max_days_per_run: Annotated[int, Field(gt=0)] | None = None
     max_tiles_per_run: Annotated[int, Field(gt=0)] | None = None
 
-    sensor: Literal["sentinel2"] | None = None
+    sensor: Literal["sentinel2", "sentinel3"] | None = None
     discovery_chunk_days: Annotated[int, Field(gt=0)] | None = None
     max_cloud_coverage: Annotated[float, Field(ge=0, le=100)] | None = None
 
@@ -85,7 +85,7 @@ class IngestionRunRequest(BaseModel):
             raise ValueError("coastal-uc3-sentinel2 requires uc3 options with time_from and time_to")
         if self.profile.startswith("uc1-") and self.uc3 is not None:
             raise ValueError("uc3 options apply only to the coastal-uc3-sentinel2 profile")
-        if self.profile != "uc1-water-pollutants-collector" and (self.sensor is not None or self.discovery_chunk_days is not None or self.max_cloud_coverage is not None):
+        if self.profile not in {"forecaster-collector", "uc1-water-pollutants-collector"} and (self.sensor is not None or self.discovery_chunk_days is not None or self.max_cloud_coverage is not None):
             raise ValueError("satellite collector options apply only to the uc1-water-pollutants-collector profile")
         return self
 
