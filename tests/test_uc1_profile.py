@@ -36,7 +36,7 @@ def test_exact_calls_and_payloads(settings, monkeypatch, profile):
         path = httpx.URL(url).path
         if path.endswith('/jobs'): body = {"job_id": "job", "status": "queued", "extra": 1}
         elif path.endswith('/river-analyses/river'): body = {"analysis_area_id": "river", "extra": 2}
-        elif path.endswith('/marine-analyses'): body = [{"marine_analysis_area_id": "other"}, {"marine_analysis_area_id": "sea", "extra": 3}]
+        elif path.endswith('/marine-analyses'): body = {"count": 2, "analyses": [{"marine_analysis_area_id": "other", "river_analysis_area_id": "river"}, {"marine_analysis_area_id": "sea", "river_analysis_area_id": "river", "extra": 3}], "metadata": "preserved"}
         else: body = {"status": "success", "dataset": "test", "extra": 4, **({"marine_analysis_area_id": "sea"} if profile == 'sea' else {"analysis_area_id": "river"})}
         return httpx.Response(202 if path.endswith('/jobs') else 200, json=body)
     monkeypatch.setattr(httpx.Client, 'request', request)
@@ -52,7 +52,7 @@ def test_exact_calls_and_payloads(settings, monkeypatch, profile):
     elif profile == 'sea':
         assert calls[0][2]['params'] == {'river_analysis_area_id': 'river'}
         assert calls[1][2]['json'] == {'marine_analysis_area_id': 'sea', 'action_date': today, 'horizon_days': 6, 'source': 'ecmwf'}
-        assert result['static_marine_analysis'][1]['extra'] == 3
+        assert result['static_marine_analysis'] == {'count': 2, 'analyses': [{'marine_analysis_area_id': 'other', 'river_analysis_area_id': 'river'}, {'marine_analysis_area_id': 'sea', 'river_analysis_area_id': 'river', 'extra': 3}], 'metadata': 'preserved'}
         assert result['ifs_ingestion']['extra'] == 4
     else:
         assert calls[1][2]['json'] == {'analysis_area_id': 'river', 'action_date': today}
@@ -90,11 +90,11 @@ def test_marine_mismatch_stops(settings, monkeypatch, analyses):
     calls = []
     def request(self, method, url, **kwargs):
         calls.append(url)
-        return httpx.Response(200, json=analyses)
+        return httpx.Response(200, json={'count': len(analyses), 'analyses': analyses})
     monkeypatch.setattr(httpx.Client, 'request', request)
     result = run_uc1_sea_adapter(REQUEST)
     assert result['status'] == 'partial'
-    assert result['static_marine_analysis'] == analyses
+    assert result['static_marine_analysis'] == {'count': len(analyses), 'analyses': analyses}
     assert len(calls) == 1
 
 def test_ca_bundle_uses_verifying_ssl_context(settings, monkeypatch):
@@ -132,7 +132,7 @@ def test_http_failure_after_lookup_returns_partial(settings, monkeypatch, profil
     def request(self, method, url, **kwargs):
         calls.append((method, url))
         if len(calls) == 1:
-            body = {'analysis_area_id': 'river', 'metadata': 'preserved'} if profile == 'river' else [{'marine_analysis_area_id': 'sea', 'metadata': 'preserved'}]
+            body = {'analysis_area_id': 'river', 'metadata': 'preserved'} if profile == 'river' else {'count': 1, 'analyses': [{'marine_analysis_area_id': 'sea', 'river_analysis_area_id': 'river', 'metadata': 'preserved'}]}
             return httpx.Response(200, json=body)
         return httpx.Response(503)
     monkeypatch.setattr(httpx.Client, 'request', request)
@@ -166,7 +166,7 @@ async def test_endpoint_aggregates_mocked_responses(settings, monkeypatch, profi
     def request(self, method, url, **kwargs):
         path = httpx.URL(url).path
         if path.endswith('/river-analyses/river'): body = {'analysis_area_id': 'river', 'extra': 1}
-        elif path.endswith('/marine-analyses'): body = [{'marine_analysis_area_id': 'sea', 'extra': 2}]
+        elif path.endswith('/marine-analyses'): body = {'count': 1, 'analyses': [{'marine_analysis_area_id': 'sea', 'river_analysis_area_id': 'river', 'extra': 2}]}
         else: body = {'status': 'success', 'dataset': 'test', 'extra': 3, **({'marine_analysis_area_id': 'sea'} if profile.endswith('sea') else {'analysis_area_id': 'river'})}
         return httpx.Response(200, json=body)
     monkeypatch.setattr(httpx.Client, 'request', request)
@@ -232,10 +232,10 @@ def test_inconsistent_marine_association_stops(settings, monkeypatch, analyses):
     calls = []
     def request(self, method, url, **kwargs):
         calls.append(url)
-        return httpx.Response(200, json=analyses)
+        return httpx.Response(200, json={'count': len(analyses), 'analyses': analyses})
     monkeypatch.setattr(httpx.Client, 'request', request)
     result = run_uc1_sea_adapter(REQUEST)
-    assert result['status'] == 'partial' and result['static_marine_analysis'] == analyses
+    assert result['status'] == 'partial' and result['static_marine_analysis'] == {'count': len(analyses), 'analyses': analyses}
     assert len(calls) == 1
 
 @pytest.mark.parametrize('name', ['UC1_HYDRO_BASE_URL', 'UC1_HYDRO_API_KEY', 'UC1_SPERCHIOS_ANALYSIS_AREA_ID'])
@@ -262,3 +262,27 @@ def test_invalid_satellite_submission(settings, monkeypatch, body):
     monkeypatch.setattr(httpx.Client, 'request', lambda *args, **kwargs: httpx.Response(202, json=body))
     with pytest.raises(CollectorExecutionError):
         run_uc1_water_pollutants_adapter(REQUEST)
+
+@pytest.mark.parametrize('body', [
+    {},
+    {'count': 0},
+    {'count': 0, 'analyses': None},
+    {'count': 1, 'analyses': []},
+    {'count': 0, 'analyses': [{}]},
+    {'count': True, 'analyses': [{}]},
+    {'count': '1', 'analyses': [{}]},
+    {'count': 1, 'analyses': ['invalid']},
+    {'count': 1, 'analyses': [{'marine_analysis_area_id': 'sea'}]},
+    [],
+])
+def test_invalid_marine_envelope_stops_ifs(settings, monkeypatch, body):
+    calls = []
+    def request(self, method, url, **kwargs):
+        calls.append((method, url))
+        return httpx.Response(200, json=body)
+    monkeypatch.setattr(httpx.Client, 'request', request)
+    result = run_uc1_sea_adapter(REQUEST)
+    assert result['status'] == 'partial'
+    assert result['error']['step'] == 'static_marine_analysis'
+    assert result['static_marine_analysis'] == body
+    assert len(calls) == 1

@@ -40,12 +40,17 @@ def _run(config, sea):
         with UC1Client(settings) as client:
             if sea:
                 step = "static_marine_analysis"
-                analyses = client.request("Hydro Modeling", "GET", "/static/marine-analyses", params={"river_analysis_area_id": settings.river_id})
-                result[step] = analyses
-                if not isinstance(analyses, list) or any(not isinstance(item, dict) for item in analyses):
-                    raise CollectorExecutionError("Hydro Modeling returned an invalid marine analysis list.")
+                response = client.request("Hydro Modeling", "GET", "/static/marine-analyses", params={"river_analysis_area_id": settings.river_id})
+                result[step] = response
+                if not isinstance(response, dict):
+                    raise CollectorExecutionError("Hydro Modeling returned an invalid marine analysis response.")
+                analyses = response.get("analyses")
+                count = response.get("count")
+                if (not isinstance(analyses, list) or any(not isinstance(item, dict) for item in analyses)
+                        or type(count) is not int or count != len(analyses)):
+                    raise CollectorExecutionError("Hydro Modeling returned an invalid marine analysis list or count.")
                 matches = [item for item in analyses if item.get("marine_analysis_area_id") == settings.marine_id]
-                if len(matches) != 1 or matches[0].get("river_analysis_area_id", settings.river_id) != settings.river_id:
+                if len(matches) != 1 or matches[0].get("river_analysis_area_id") != settings.river_id:
                     raise CollectorConfigurationError("Configured marine analysis was not found uniquely for the Sperchios river.")
                 step = "ifs_ingestion"
                 result[step] = client.request("Hydro Modeling", "POST", "/data-ingestion/ifs", payload={"marine_analysis_area_id": matches[0]["marine_analysis_area_id"], "action_date": today, "horizon_days": 6, "source": "ecmwf"})
