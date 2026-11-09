@@ -15,6 +15,10 @@ class CollectorUnavailableError(CollectorAdapterError):
     """The collector's persistence services are unavailable."""
 
 
+class CollectorJobNotFoundError(CollectorConfigurationError):
+    """The remote satellite job does not exist."""
+
+
 class CollectorExecutionError(CollectorAdapterError):
     """The collector failed during execution."""
 

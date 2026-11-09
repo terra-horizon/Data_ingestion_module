@@ -3,7 +3,7 @@ from datetime import datetime, timezone
 from hashlib import sha256
 from time import monotonic, sleep
 from urllib.parse import quote
-from app.adapters.common import CollectorAdapterError, CollectorConfigurationError, CollectorExecutionError
+from app.adapters.common import CollectorAdapterError, CollectorConfigurationError, CollectorExecutionError, CollectorUnavailableError
 from app.adapters.uc1_client import Settings, UC1Client
 from app.schemas.uc1 import ReanalysisResult, LocalForecastResult, IfsResult
 from pydantic import ValidationError
@@ -88,6 +88,31 @@ def run_uc1_sea_adapter(config):
     return _run(config, True)
 
 
+def _validate_job_id(job_id):
+    if (not isinstance(job_id, str) or not job_id.strip() or job_id in {".", ".."}
+            or any(c in job_id for c in "/\\?#")):
+        raise CollectorExecutionError("Satellite collector returned an invalid job ID.")
+
+
+def _get_satellite_job(client, job_id, timeout=None, submission=None):
+    _validate_job_id(job_id)
+    job = client.request("Satellite collector", "GET", "/api/collection/jobs/" + quote(job_id, safe=""), timeout=timeout)
+    if (not isinstance(job, dict) or job.get("job_id") != job_id
+            or job.get("status") not in {"queued", "running", "succeeded", "partial", "failed"}):
+        raise CollectorExecutionError("Satellite collector returned an invalid job response.")
+    if submission:
+        for key in ("run_job_id", "aoi_id", "sensor"):
+            if key in submission and job.get(key) != submission[key]:
+                raise CollectorExecutionError("Satellite collector returned inconsistent job metadata.")
+    return job
+
+
+def get_satellite_job(job_id):
+    settings = Settings.from_env("satellite")
+    with UC1Client(settings) as client:
+        return _get_satellite_job(client, job_id)
+
+
 def run_uc1_water_pollutants_adapter(config):
     settings = Settings.from_env("satellite")
     # Derive the date from the request so retries of the same run keep the same ID.
@@ -98,25 +123,28 @@ def run_uc1_water_pollutants_adapter(config):
         deadline = monotonic() + settings.max_wait
         result = {"status": "pending", "satellite_submission": submission, "satellite_collection": latest}
         statuses = {"succeeded": "success", "partial": "partial", "failed": "failed"}
+        transient_failures = 0
         while True:
             remaining = deadline - monotonic()
             if remaining <= 0:
                 result["reason"] = "poll_timeout"
                 return result
             try:
-                job = client.request("Satellite collector", "GET", "/api/collection/jobs/" + quote(submission["job_id"], safe=""), timeout=remaining)
-                if (not isinstance(job, dict) or job.get("job_id") != submission["job_id"]
-                        or job.get("status") not in {"queued", "running", "succeeded", "partial", "failed"}):
-                    raise CollectorExecutionError("Satellite collector returned an invalid job response.")
-                for key in ("run_job_id", "aoi_id", "sensor"):
-                    if key in submission and job.get(key) != submission[key]:
-                        raise CollectorExecutionError("Satellite collector returned inconsistent job metadata.")
+                job = _get_satellite_job(client, submission["job_id"], timeout=min(remaining, settings.read_timeout), submission=submission)
+                transient_failures = 0
                 result["satellite_collection"] = job
                 status = job["status"]
                 if status in statuses:
                     result["status"] = statuses[status]
                     return result
             except CollectorAdapterError as exc:
+                if isinstance(exc, CollectorUnavailableError):
+                    transient_failures += 1
+                    if transient_failures < 3:
+                        remaining = deadline - monotonic()
+                        if remaining > 0:
+                            sleep(min(settings.poll_interval, remaining))
+                        continue
                 result["reason"] = "poll_error"
                 result["error"] = {"step": "satellite_poll", "category": type(exc).__name__, "message": str(exc)}
                 return result

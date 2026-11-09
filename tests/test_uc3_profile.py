@@ -44,10 +44,9 @@ UC1_REQUEST = {
     "run_job_id": "job-sperchios-001",
     "triggered_at": "2026-08-11T10:00:00+03:00",
     "provider": "sentinel-2",
-    "profile": "forecaster-collector",
+    "profile": "uc1-water-pollutants-collector",
     "aoi_id": "sperchios",
     "bbox": [22.433493, 38.837552, 22.569555, 38.894223],
-    "run_name": "sperchios",
 }
 
 
@@ -102,9 +101,8 @@ async def test_uc3_run_returns_the_wp2_envelope(client, recorded):
         {**UC3_REQUEST, "uc3": {**UC3_REQUEST["uc3"], "selection_policy": "custom"}},
         {**UC3_REQUEST, "provider": "CDSE"},
         {**UC1_REQUEST, "uc3": UC3_REQUEST["uc3"]},
-        {key: value for key, value in UC1_REQUEST.items() if key != "run_name"},
     ],
-    ids=["no_uc3", "storage_field", "naive_time", "empty_window", "free_policy", "outer_provider", "uc3_on_uc1", "uc1_without_run_name"],
+    ids=["no_uc3", "storage_field", "naive_time", "empty_window", "free_policy", "outer_provider", "uc3_on_uc1"],
 )
 async def test_profile_specific_validation(client, invalid):
     response = await client.post("/api/ingestion/run", json=invalid)
@@ -112,7 +110,7 @@ async def test_profile_specific_validation(client, invalid):
 
 
 async def test_uc1_requests_are_unchanged(monkeypatch, client):
-    monkeypatch.setitem(__import__("app.services.ingestion", fromlist=["PROFILE_RUNNERS"]).PROFILE_RUNNERS, "forecaster-collector", Mock(return_value={"status": "success"}))
+    monkeypatch.setitem(__import__("app.services.ingestion", fromlist=["PROFILE_RUNNERS"]).PROFILE_RUNNERS, "uc1-water-pollutants-collector", Mock(return_value={"status": "success"}))
     response = await client.post("/api/ingestion/run", json=UC1_REQUEST)
     assert response.status_code == 200 and response.json()["status"] == "success"
 
@@ -232,7 +230,7 @@ async def test_missing_package_returns_503_without_disabling_uc1(monkeypatch, cl
     response = await client.post("/api/ingestion/run", json=UC3_REQUEST)
     assert response.status_code == 503
     assert "private installation detail" not in response.text
-    monkeypatch.setitem(__import__("app.services.ingestion", fromlist=["PROFILE_RUNNERS"]).PROFILE_RUNNERS, "forecaster-collector", Mock(return_value={"status": "success"}))
+    monkeypatch.setitem(__import__("app.services.ingestion", fromlist=["PROFILE_RUNNERS"]).PROFILE_RUNNERS, "uc1-water-pollutants-collector", Mock(return_value={"status": "success"}))
     assert (await client.post("/api/ingestion/run", json=UC1_REQUEST)).status_code == 200
 
 

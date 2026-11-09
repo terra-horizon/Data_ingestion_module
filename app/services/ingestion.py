@@ -11,7 +11,6 @@ from app.schemas.ingestion import IngestionProfile, IngestionRunRequest
 ProfileRunner = Callable[[Mapping[str, Any]], dict[str, Any]]
 
 PROFILE_RUNNERS: dict[IngestionProfile, ProfileRunner] = {
-    "forecaster-collector": run_uc1_water_pollutants_adapter,
     "coastal-uc3-sentinel2": run_uc3_adapter,
     "uc1-water-pollutants-collector": run_uc1_water_pollutants_adapter,
     "uc1-sperchios-river": run_uc1_river_adapter,
@@ -23,7 +22,7 @@ async def execute_ingestion_profile(request: IngestionRunRequest) -> dict[str, A
     """Execute the adapter registered for the request's server-approved profile."""
     runner = PROFILE_RUNNERS[request.profile]
     config = request.model_dump(mode="json", exclude_none=True)
-    if request.profile in {"forecaster-collector", "uc1-water-pollutants-collector"}:
+    if request.profile == "uc1-water-pollutants-collector":
         for name in ("history_start", "mode"):
             if name not in request.model_fields_set:
                 config.pop(name, None)

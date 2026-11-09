@@ -14,10 +14,9 @@ def settings(monkeypatch):
     for key, value in {"UC1_COLLECTOR_BASE_URL": "https://collector.test/prefix", "UC1_COLLECTOR_API_KEY": "secret1", "UC1_HYDRO_BASE_URL": "https://hydro.test/prefix", "UC1_HYDRO_API_KEY": "secret2", "UC1_SPERCHIOS_ANALYSIS_AREA_ID": "river", "UC1_SPERCHIOS_MARINE_ANALYSIS_AREA_ID": "sea"}.items():
         monkeypatch.setenv(key, value)
 
-@pytest.mark.parametrize("profile", ["uc1-water-pollutants-collector", "uc1-sperchios-river", "uc1-sperchios-sea", "coastal-uc3-sentinel2", "forecaster-collector"])
+@pytest.mark.parametrize("profile", ["uc1-water-pollutants-collector", "uc1-sperchios-river", "uc1-sperchios-sea", "coastal-uc3-sentinel2"])
 def test_profiles(profile):
     data = {**REQUEST, "profile": profile}
-    if profile == "forecaster-collector": data["run_name"] = "test"
     if profile == "coastal-uc3-sentinel2": data["uc3"] = {"contract_version": 2, "mode": "window", "time_from": "2026-01-01T00:00:00Z", "time_to": "2026-01-02T00:00:00Z"}
     assert IngestionRunRequest.model_validate(data).profile == profile
     assert profile in PROFILE_RUNNERS
@@ -332,6 +331,7 @@ def test_satellite_poll_timeout_preserves_latest_job(settings, monkeypatch):
 @pytest.mark.parametrize('failure', ['auth', 'unavailable', 'json', 'status', 'job_id', 'metadata', 'connection'])
 def test_satellite_poll_failure_preserves_submission(settings, monkeypatch, failure):
     calls = []
+    monkeypatch.setattr('app.adapters.uc1.sleep', lambda seconds: None)
     def request(self, method, url, **kwargs):
         calls.append(method)
         if method == 'POST': return httpx.Response(202, json={'job_id': 'job', 'status': 'queued', 'aoi_id': 'sperchios'})
@@ -348,7 +348,48 @@ def test_satellite_poll_failure_preserves_submission(settings, monkeypatch, fail
     result = run_uc1_water_pollutants_adapter(REQUEST)
     assert result['status'] == 'pending' and result['reason'] == 'poll_error'
     assert result['satellite_submission']['job_id'] == 'job'
-    assert 'secret1' not in str(result) and calls == ['POST', 'GET']
+    assert 'secret1' not in str(result)
+    assert calls == ['POST'] + ['GET'] * (3 if failure in ('unavailable', 'connection') else 1)
+
+
+def test_transient_poll_failure_recovers_without_resubmission(settings, monkeypatch):
+    calls = []
+    monkeypatch.setattr('app.adapters.uc1.sleep', lambda seconds: None)
+    def request(self, method, url, **kwargs):
+        calls.append(method)
+        if method == 'POST':
+            return httpx.Response(202, json={'job_id': 'job', 'status': 'queued'})
+        if calls.count('GET') == 1:
+            return httpx.Response(503)
+        return httpx.Response(200, json={'job_id': 'job', 'status': 'succeeded', 'result': {'value': 1}})
+    monkeypatch.setattr(httpx.Client, 'request', request)
+    result = run_uc1_water_pollutants_adapter(REQUEST)
+    assert result['status'] == 'success' and result['satellite_collection']['result'] == {'value': 1}
+    assert calls == ['POST', 'GET', 'GET']
+
+
+@pytest.mark.asyncio
+async def test_satellite_status_endpoint(settings, monkeypatch):
+    from app.main import app
+    calls = []
+    def request(self, method, url, **kwargs):
+        calls.append((method, url, kwargs['headers']['X-API-Key']))
+        return httpx.Response(200, json={'job_id': 'job', 'status': 'failed', 'error': {'detail': 'failure'}})
+    monkeypatch.setattr(httpx.Client, 'request', request)
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url='http://test') as client:
+        response = await client.get('/api/ingestion/satellite/jobs/job')
+    assert response.status_code == 200
+    assert response.json()['error'] == {'detail': 'failure'}
+    assert calls == [('GET', 'https://collector.test/prefix/api/collection/jobs/job', 'secret1')]
+
+
+@pytest.mark.asyncio
+async def test_unknown_satellite_field_rejected():
+    from app.main import app
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url='http://test') as client:
+        response = await client.post('/api/ingestion/run', json={**REQUEST, 'profile': 'uc1-water-pollutants-collector', 'unsupported': 1})
+    assert response.status_code == 422
+    assert 'Unsupported satellite request fields' in response.text
 
 @pytest.mark.parametrize('value', ['0', '-1', 'nan', 'invalid'])
 def test_invalid_poll_settings(settings, monkeypatch, value):
@@ -383,3 +424,38 @@ def test_satellite_sensor3_is_forwarded(settings, monkeypatch):
     config = {**REQUEST, 'sensor': 'sentinel3'}
     assert run_uc1_water_pollutants_adapter(config)['status'] == 'success'
     assert calls[0]['sensor'] == 'sentinel3'
+
+
+def test_exactly_four_profiles_are_registered():
+    from typing import get_args
+    from app.schemas.ingestion import IngestionProfile
+    from app.services.ingestion import PROFILE_RUNNERS
+    expected = {'uc1-water-pollutants-collector', 'uc1-sperchios-river', 'uc1-sperchios-sea', 'coastal-uc3-sentinel2'}
+    assert set(PROFILE_RUNNERS) == set(get_args(IngestionProfile)) == expected
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('override', [
+    {'aoi_id': 'Sperchios'}, {'aoi_id': 'x' * 121}, {'aoi_id': '-invalid'},
+    {'run_job_id': 'x' * 201}, {'discovery_chunk_days': 367},
+    {'discovery_chunk_days': 0}, {'discovery_chunk_days': 1.5},
+    {'max_cloud_coverage': 30.5}, {'max_cloud_coverage': 101},
+    {'max_days_per_run': True}, {'max_tiles_per_run': '2'}, {'run_name': 'old'},
+    {'bbox': ['22.4', 38.8, 22.5, 38.9]}, {'bbox': [False, 38.8, 22.5, 38.9]},
+])
+async def test_invalid_satellite_contract_rejected(override):
+    from app.main import app
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url='http://test') as client:
+        response = await client.post('/api/ingestion/run', json={**REQUEST, 'profile': 'uc1-water-pollutants-collector', **override})
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('upstream,expected', [(404, 404), (401, 400), (503, 503)])
+async def test_status_endpoint_upstream_errors(settings, monkeypatch, upstream, expected):
+    from app.main import app
+    monkeypatch.setattr(httpx.Client, 'request', lambda *args, **kwargs: httpx.Response(upstream, text='secret1'))
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url='http://test') as client:
+        response = await client.get('/api/ingestion/satellite/jobs/job')
+    assert response.status_code == expected
+    assert 'secret1' not in response.text

@@ -5,7 +5,7 @@ import ssl
 from dataclasses import dataclass
 from urllib.parse import urlsplit
 import httpx
-from app.adapters.common import CollectorConfigurationError, CollectorExecutionError, CollectorUnavailableError
+from app.adapters.common import CollectorConfigurationError, CollectorExecutionError, CollectorUnavailableError, CollectorJobNotFoundError
 
 @dataclass(frozen=True)
 class Settings:
@@ -94,8 +94,10 @@ class UC1Client:
         if response.status_code in (401, 403):
             raise CollectorConfigurationError(f"{service} rejected its configured credential.")
         if response.status_code == 404 and method == "GET":
+            if service == "Satellite collector":
+                raise CollectorJobNotFoundError("Satellite collector job was not found.")
             raise CollectorConfigurationError(f"{service} static analysis was not found.")
-        if response.status_code in (429, 502, 503, 504):
+        if response.status_code in (429, 502, 503, 504) or (service == "Satellite collector" and response.status_code == 500):
             raise CollectorUnavailableError(f"{service} is unavailable (HTTP {response.status_code}).")
         if not 200 <= response.status_code < 300 or (expected and response.status_code != expected):
             raise CollectorExecutionError(f"{service} returned an unexpected HTTP status ({response.status_code}).")

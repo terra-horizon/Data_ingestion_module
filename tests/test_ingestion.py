@@ -10,10 +10,9 @@ VALID_REQUEST = {
     "run_job_id": "job-sperchios-001",
     "triggered_at": "2026-08-11T10:00:00+03:00",
     "provider": "sentinel-2",
-    "profile": "forecaster-collector",
+    "profile": "uc1-water-pollutants-collector",
     "aoi_id": "sperchios",
     "bbox": [22.433493, 38.837552, 22.569555, 38.894223],
-    "run_name": "sperchios",
     "history_start": "2016-01-01",
     "mode": "auto",
     "max_days_per_run": 1,
@@ -29,7 +28,7 @@ async def client():
 
 
 @pytest.mark.asyncio
-async def test_legacy_ingestion_uses_remote_adapter(monkeypatch, client):
+async def test_satellite_ingestion_uses_remote_adapter(monkeypatch, client):
     calls = []
     for key, value in {"UC1_COLLECTOR_BASE_URL": "https://collector.test", "UC1_COLLECTOR_API_KEY": "test-key"}.items():
         monkeypatch.setenv(key, value)
@@ -42,7 +41,7 @@ async def test_legacy_ingestion_uses_remote_adapter(monkeypatch, client):
     response = await client.post("/api/ingestion/run", json=VALID_REQUEST)
     assert response.status_code == 200
     body = response.json()
-    assert body["profile"] == "forecaster-collector" and body["status"] == "success"
+    assert body["profile"] == "uc1-water-pollutants-collector" and body["status"] == "success"
     assert body["collector_result"]["satellite_collection"]["result"] == {"data": 2}
     assert [call[0] for call in calls] == ["POST", "GET"]
     assert "run_name" not in calls[0][2]["json"]
@@ -57,6 +56,7 @@ async def test_legacy_ingestion_uses_remote_adapter(monkeypatch, client):
         {key: value for key, value in VALID_REQUEST.items() if key != "aoi_id"},
         {key: value for key, value in VALID_REQUEST.items() if key != "profile"},
         {**VALID_REQUEST, "profile": "unknown-process"},
+        {**VALID_REQUEST, "profile": "forecaster-collector"},
         {**VALID_REQUEST, "bbox": [22.4, 38.8, 22.5]},
         {**VALID_REQUEST, "bbox": [22.5, 38.8, 22.4, 38.9]},
         {**VALID_REQUEST, "triggered_at": "2026-08-11T10:00:00"},
