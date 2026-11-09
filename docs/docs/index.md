@@ -4,7 +4,7 @@ The Data Ingestion Module is a Python 3.12+ FastAPI service that exposes registe
 
 It integrates the remote UC1 collector and independently maintained UC3 package:
 
-- **UC1 — `forecaster-collector`:** Compatibility alias for the remote satellite collector.
+- **UC1 — `uc1-water-pollutants-collector`:** Remote satellite collector, alongside river and sea Hydro Modeling profiles.
 - **UC3 — `coastal-uc3-sentinel2`:** Runs the TERRA UC3 ingestion package, supplied as a private Python wheel.
 
 All profiles use the same API and execution infrastructure while keeping service configuration and storage responsibilities separate.
@@ -23,7 +23,6 @@ All profiles use the same API and execution infrastructure while keeping service
 
 | Profile | Workflow |
 |---|---|
-| `forecaster-collector` | Submit and monitor the remote satellite collection job. |
 | `uc1-water-pollutants-collector` | Submit and monitor a remote satellite collection job. |
 | `uc1-sperchios-river` | Run river reanalysis and forecast through Hydro Modeling. |
 | `uc1-sperchios-sea` | Run marine IFS ingestion through Hydro Modeling. |

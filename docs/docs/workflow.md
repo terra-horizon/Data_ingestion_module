@@ -1,6 +1,6 @@
 # Ingestion Workflow
 
-All five profiles run via `POST /api/ingestion/run` in a worker thread. `forecaster-collector` is a compatibility alias for `uc1-water-pollutants-collector`; `run_name` is accepted for legacy callers but never forwarded.
+All four profiles run via `POST /api/ingestion/run` in a worker thread.
 
 The satellite adapter submits one remote job, then polls its job status until `succeeded`, `partial`, or `failed`, or until the configured deadline. It maps these to `success`, `partial`, and `failed`. A timeout or poll error returns `pending`, the submission and latest known job response; it does not cancel or resubmit the job. The remote worker owns data acquisition and persistence.
 

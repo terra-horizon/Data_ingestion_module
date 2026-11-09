@@ -30,8 +30,6 @@ Inject these environment variables into the application process (see `.env.examp
 
 Only the selected profile?s service configuration is required. Configuration is validated before requests. The service uses the configured river ID to find the static analysis and checks the configured marine ID against the filtered list; it never creates analyses. Run `python -m pytest tests/test_uc1_profile.py` for mocked local integration tests.
 
-`UC1_HTTP_CA_BUNDLE` optionally points to a readable PEM trust bundle for the UC1 HTTP client. It supplies that client's trusted roots and leaves certificate and hostname verification enabled. If omitted, HTTPX uses its default trust configuration. When running in a container, use a path inside the container. See the [manual testing guide](../../tests_external/README.md).
-
-`UC1_COLLECTOR_POLL_INTERVAL_SECONDS` defaults to 10 and `UC1_COLLECTOR_MAX_WAIT_SECONDS` defaults to 1800; both must be finite and positive. The wait starts after successful submission. Configure client/proxy timeouts accordingly.
+`UC1_COLLECTOR_POLL_INTERVAL_SECONDS` defaults to 10 and `UC1_COLLECTOR_MAX_WAIT_SECONDS` defaults to 1800; both must be finite and positive. The wait starts after successful submission. Client or proxy timeouts may end the request earlier; use a suitably bounded wait and retain the returned job ID for the status endpoint. This process does not durably store submitted IDs.
 
 On the shared production Docker network use `http://uc1-water-pollutants-collector:8000` and `http://hydro-modeling-service:8000` as the respective base URLs. External URLs may require their proxy prefixes.

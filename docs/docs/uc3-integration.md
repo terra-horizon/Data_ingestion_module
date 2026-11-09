@@ -49,8 +49,6 @@ The intended shared deployment uses database `terra-db`, collection prefix `uc3_
 }
 ```
 
-The UC3 object requires version 2, `mode` (`latest` or `window`), and an explicit, timezone-aware increasing time window. Offsets are normalised to UTC by the package. `selection_policy` defaults to `uc3_parity_pilot`; the other supported policy is `uc3_monthly_backfill`. `max_scenes` is an integer from 1 to 24; omitted, the current policies use 3. Optional package metadata fields are `project_id`, `request_id`, `registry_version`, and `window_id`. Unknown nested fields are rejected. AOI ID and bbox must match the operator-selected or packaged authorised registry (package tolerance: 0.000001 degrees). They are checked before acquisition. UC3 requires no `run_name`, `history_start`, or `target_date`; those UC1 fields are not forwarded. The legacy `forecaster-collector` profile still requires `run_name`; remote collector defaults apply to omitted satellite options.
-
 | Result | HTTP | Meaning |
 | --- | --- | --- |
 | `completed` | 200 | Acquisition completed; inspect scene IDs and output references. |

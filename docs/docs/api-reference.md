@@ -6,7 +6,6 @@ The module exposes a synchronous REST API for registered ingestion workflows. Bo
 
 | Profile | Workflow |
 |---|---|
-| `forecaster-collector` | UC1 statistical collection and processing |
 | `uc1-water-pollutants-collector` | Remote satellite collector job |
 | `uc1-sperchios-river` | Hydro Modeling river ingestion |
 | `uc1-sperchios-sea` | Hydro Modeling marine ingestion |
@@ -55,7 +54,7 @@ HTTP status is `200` when every check is `ok`, otherwise `503`. This does not te
 
 ## `POST /api/ingestion/run`
 
-Runs the selected profile in a worker thread and keeps the HTTP request open until it finishes. A normal collector outcome (including UC3 `no_data` or `failed`) is returned with HTTP `200`; HTTP errors are reserved for validation, configuration, availability, concurrency, and unexpected execution errors described below. The satellite profile submits and polls a job on the remote collector; this module exposes no polling endpoint.
+Runs the selected profile in a worker thread and keeps the HTTP request open until it finishes. A normal collector outcome (including UC3 `no_data` or `failed`) is returned with HTTP `200`; HTTP errors are reserved for validation, configuration, availability, concurrency, and unexpected execution errors described below. The satellite profiles submit and poll a remote job. Retrieve a known job later with `GET /api/ingestion/satellite/jobs/{job_id}`; this returns the validated upstream job body and does not submit a job.
 
 ### Common request fields
 
@@ -64,15 +63,17 @@ Runs the selected profile in a worker thread and keeps the HTTP request open unt
 | `run_job_id` | Yes | Non-empty orchestration/correlation identifier. UC3 also uses it as the package correlation ID. |
 | `triggered_at` | Yes | ISO 8601 datetime with a timezone offset. |
 | `provider` | Yes | Literal `sentinel-2`. |
-| `profile` | Yes | `forecaster-collector`, `uc1-water-pollutants-collector`, `uc1-sperchios-river`, `uc1-sperchios-sea`, or `coastal-uc3-sentinel2`. |
+| `profile` | Yes | `uc1-water-pollutants-collector`, `uc1-sperchios-river`, `uc1-sperchios-sea`, or `coastal-uc3-sentinel2`. |
 | `aoi_id` | Yes | Non-empty AOI identifier. UC3 additionally checks it against the configured authorised AOI registry. |
 | `bbox` | Yes | Four WGS84 numbers `[min_lon, min_lat, max_lon, max_lat]`; must be ordered and within longitude/latitude ranges. UC3 also checks it matches the registered AOI. |
 
 The outer request model permits extra fields by Pydantic's default behavior. The nested `uc3` object explicitly rejects unknown fields. UC1-only fields are not forwarded to the UC3 package.
 
-### UC1 satellite collector profiles
+### UC1 satellite collector profile
 
-`forecaster-collector` is a compatibility alias for `uc1-water-pollutants-collector`. Legacy requests require `run_name`, which is not forwarded. The remote profile accepts optional `sensor` (`sentinel2` or `sentinel3`), `mode`, `history_start`, `target_date`, `max_days_per_run`, `max_tiles_per_run`, `discovery_chunk_days`, and `max_cloud_coverage`. Omitted options use upstream defaults. Both profiles submit one job and poll it, preserving the original submission and latest job response.
+The `uc1-water-pollutants-collector` profile accepts optional `sensor` (`sentinel2` or `sentinel3`), `mode`, `history_start`, `target_date`, `max_days_per_run`, `max_tiles_per_run`, `discovery_chunk_days`, and `max_cloud_coverage`. Omitted options use upstream defaults: `sentinel2`, `auto`, `2016-01-01`, UTC today, 31 days and 30 percent, respectively. The limits default to null. The common `provider` remains `sentinel-2`; an explicit `sensor` selects the upstream sensor. AOI IDs must match `[a-z0-9][a-z0-9_-]*` and be at most 120 characters; run IDs are at most 200 characters. Discovery chunk days must be 1–366, cloud coverage an integer 0–100, and limits positive integers. It submits one job and polls it, preserving the original submission and latest job response.
+
+Unknown satellite request fields are rejected with HTTP 422. Save `collector_result.satellite_submission.job_id` and use the status endpoint above to recover a pending job. Polling retries transient availability failures at the configured interval up to three consecutive failures; it never retries submission. A client or proxy may disconnect before the wait expires, and this service does not persist the submission or provide durable orchestration. In that case recovery requires an ID obtained from the collector or its logs; do not blindly resubmit.
 
 ### UC3: `coastal-uc3-sentinel2`
 
@@ -123,7 +124,7 @@ The API wraps each adapter result in this application-owned envelope. `status` i
 {
   "run_job_id": "job-id",
   "provider": "sentinel-2",
-  "profile": "forecaster-collector",
+  "profile": "uc1-water-pollutants-collector",
   "aoi_id": "sperchios",
   "triggered_at": "2026-08-14T07:30:00+03:00",
   "started_at": "2026-08-14T04:30:01Z",

@@ -17,7 +17,7 @@ TERRA Orchestrator -> Data Ingestion Module -> Satellite Water Pollutants Collec
                                                  -> independent collection worker -> MongoDB / MinIO
 ```
 
-The module submits and monitors remote collector jobs. `forecaster-collector` is a compatibility alias for `uc1-water-pollutants-collector`; the river and sea profiles independently call Hydro Modeling. UC3 remains an independently installed package.
+The four profiles are `uc1-water-pollutants-collector`, `uc1-sperchios-river`, `uc1-sperchios-sea`, and `coastal-uc3-sentinel2`. The satellite profile submits and monitors remote collector jobs; river and sea independently call Hydro Modeling. UC3 remains an independently installed package.
 
 ## Local setup
 
@@ -62,10 +62,9 @@ Send `POST /api/ingestion/run`:
   "run_job_id": "job-sperchios-20260814-001",
   "triggered_at": "2026-08-14T07:30:00+03:00",
   "provider": "sentinel-2",
-  "profile": "forecaster-collector",
+  "profile": "uc1-water-pollutants-collector",
   "aoi_id": "sperchios",
   "bbox": [22.433493, 38.837552, 22.569555, 38.894223],
-  "run_name": "sperchios",
   "history_start": "2016-01-01",
   "mode": "auto",
   "max_days_per_run": 1,
@@ -76,7 +75,9 @@ Send `POST /api/ingestion/run`:
 Use `tests_external/ingestion.http` to send the same request from an HTTP client
 that supports `.http` files.
 
-The response retains the request metadata and timings. For the two collector profiles, `collector_result.satellite_submission` contains the submission and `satellite_collection` contains the latest job response. Upstream `succeeded`, `partial`, and `failed` map to `success`, `partial`, and `failed`; a wait timeout or polling error returns `pending` and preserves the job ID. This differs from the legacy embedded collector result. `run_name` remains required for legacy requests but is not forwarded.
+The response retains the request metadata and timings. For satellite collection, `collector_result.satellite_submission` contains the submission and `satellite_collection` contains the latest job response. Upstream `succeeded`, `partial`, and `failed` map to `success`, `partial`, and `failed`; a wait timeout or polling error returns `pending` and preserves the job ID.
+
+Save `collector_result.satellite_submission.job_id` and retrieve the latest upstream status with `GET /api/ingestion/satellite/jobs/{job_id}`. The request may outlast a client or proxy timeout; this service does not persist job IDs, so if the response is lost, obtain the ID from the collector before retrying. Upstream jobs are not cancelled when polling stops.
 
 ## Docker
 
@@ -100,7 +101,7 @@ Detailed architecture, API, configuration, deployment, workflow, and QA guides a
 
 ### UC1 Sperchios delegated profiles
 
-`uc1-water-pollutants-collector`, `uc1-sperchios-river` and `uc1-sperchios-sea` run through the same `POST /api/ingestion/run` endpoint. Supply the common request fields; none requires `run_name` or `uc3` options. For example, change `profile` among the three names:
+`uc1-water-pollutants-collector`, `uc1-sperchios-river` and `uc1-sperchios-sea` run through the same `POST /api/ingestion/run` endpoint. Supply the common request fields. For example, change `profile` among the three names:
 
 ```json
 {"run_job_id":"uc1-river-001","triggered_at":"2026-11-03T07:00:00Z","provider":"sentinel-2","profile":"uc1-sperchios-river","aoi_id":"sperchios","bbox":[22.433493,38.837552,22.569555,38.894223]}
