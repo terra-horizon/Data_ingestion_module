@@ -5,7 +5,7 @@
 GET {{baseUrl}}/health/ready/coastal-uc3-sentinel2
 Accept: application/json
 
-### UC3 acquisition: publishes to configured UC3 storage; update the window before use
+### WRITES DATA: UC3 acquisition, including production if configured; update the window
 POST {{baseUrl}}/api/ingestion/run
 Content-Type: application/json
 Accept: application/json

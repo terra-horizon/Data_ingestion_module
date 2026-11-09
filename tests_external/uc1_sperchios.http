@@ -1,8 +1,10 @@
-@baseUrl = http://127.0.0.1:18000
+@localUrl = http://127.0.0.1:8000
+@productionUrl = https://server.iprism.eu/data-ingestion
+@baseUrl = {{localUrl}}
 
-### UC1 Sperchios river: runs river ingestion
+### WRITES DATA: UC1 Sperchios river ingestion (productionUrl targets production)
 ### Update run_job_id and triggered_at for each test. Adjust baseUrl for your service.
-POST {{baseUrl}}/api/ingestion/run
+POST {{productionUrl}}/api/ingestion/run
 Content-Type: application/json
 Accept: application/json
 
@@ -15,9 +17,9 @@ Accept: application/json
   "bbox": [22.433493, 38.837552, 22.569555, 38.894223]
 }
 
-### UC1 Sperchios sea: runs marine ingestion
+### WRITES DATA: UC1 Sperchios sea ingestion (productionUrl targets production)
 ### Update run_job_id and triggered_at for each test.
-POST {{baseUrl}}/api/ingestion/run
+POST {{productionUrl}}/api/ingestion/run
 Content-Type: application/json
 Accept: application/json
 
@@ -30,8 +32,8 @@ Accept: application/json
   "bbox": [22.433493, 38.837552, 22.569555, 38.894223]
 }
 
-### UC1 satellite water pollutants collector: submits an asynchronous job
-POST {{baseUrl}}/api/ingestion/run
+### WRITES DATA: UC1 satellite collection (productionUrl targets production)
+POST {{productionUrl}}/api/ingestion/run
 Content-Type: application/json
 Accept: application/json
 

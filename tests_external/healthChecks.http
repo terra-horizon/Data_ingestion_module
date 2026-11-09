@@ -5,7 +5,7 @@
 GET {{baseUrl}}/health/live
 Accept: application/json
 
-### Readiness: validates configuration, MongoDB, and MinIO connectivity
+### Readiness: checks the remote satellite collector's readiness
 GET {{baseUrl}}/health/ready
 Accept: application/json
 
