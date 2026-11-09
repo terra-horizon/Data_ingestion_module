@@ -1,14 +1,14 @@
 @localUrl = http://127.0.0.1:8000
 @productionUrl = https://server.iprism.eu/data-ingestion
 @baseUrl = {{localUrl}}
-@jobId = REPLACE_WITH_JOB_ID
+@jobId = af26fdb5b1a7432c8810cda57d5b98a2
 
 ### READ ONLY: retrieve a previously submitted satellite job
-GET {{baseUrl}}/api/ingestion/satellite/jobs/{{jobId}}
+GET {{productionUrl}}/api/ingestion/satellite/jobs/{{jobId}}
 Accept: application/json
 
 ### WRITES DATA: submits a real satellite job; productionUrl targets production from SSH
-POST {{baseUrl}}/api/ingestion/run
+POST {{productionUrl}}/api/ingestion/run
 Content-Type: application/json
 Accept: application/json
 
