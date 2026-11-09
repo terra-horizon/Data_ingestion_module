@@ -2,11 +2,13 @@
 
 ## Overview
 
-The module exposes a synchronous REST API for two Sentinel-2 workflows. Both use `provider: "sentinel-2"`; `profile` selects the adapter and determines which request fields and persistence operations apply.
+The module exposes a synchronous REST API for registered ingestion workflows. Both use `provider: "sentinel-2"`; `profile` selects the adapter and determines which request fields and persistence operations apply.
 
 | Profile | Workflow |
 |---|---|
-| `forecaster-collector` | UC1 statistical collection and processing |
+| `uc1-water-pollutants-collector` | Remote satellite collector job |
+| `uc1-sperchios-river` | Hydro Modeling river ingestion |
+| `uc1-sperchios-sea` | Hydro Modeling marine ingestion |
 | `coastal-uc3-sentinel2` | UC3 Sentinel-2 L2A scene selection, quality checks, raster delivery, and publication |
 
 ### Base URLs
@@ -33,16 +35,7 @@ HTTP status: `200`.
 
 ### `GET /health/ready`
 
-UC1 readiness check. It loads UC1 storage/provider configuration, pings the configured MongoDB database, and calls MinIO `head_bucket` for the UC1 bucket. It does not write data or contact the satellite provider. A configuration failure marks MongoDB and MinIO `skipped`; failed connectivity marks the affected dependency `unavailable`.
-
-```json
-{
-  "status": "ready",
-  "checks": {"configuration":"ok", "mongodb":"ok", "minio":"ok"}
-}
-```
-
-HTTP status is `200` when ready and `503` otherwise. The body has the same shape when not ready, with `status: "not_ready"` and per-check states.
+UC1 readiness validates local collector configuration and queries the collector's `/health/ready` endpoint with a short timeout. It does not write data. The response uses `checks.configuration` and `checks.collector`, each `ok`, `unavailable`, or `skipped`; HTTP status is 200 when ready, 503 otherwise.
 
 ### `GET /health/ready/coastal-uc3-sentinel2`
 
@@ -61,7 +54,7 @@ HTTP status is `200` when every check is `ok`, otherwise `503`. This does not te
 
 ## `POST /api/ingestion/run`
 
-Runs the selected profile in a worker thread and keeps the HTTP request open until it finishes. A normal collector outcome (including UC3 `no_data` or `failed`) is returned with HTTP `200`; HTTP errors are reserved for validation, configuration, availability, concurrency, and unexpected execution errors described below. There is no job queue, `202 Accepted`, or polling endpoint.
+Runs the selected profile in a worker thread and keeps the HTTP request open until it finishes. A normal collector outcome (including UC3 `no_data` or `failed`) is returned with HTTP `200`; HTTP errors are reserved for validation, configuration, availability, concurrency, and unexpected execution errors described below. The satellite profiles submit and poll a remote job. Retrieve a known job later with `GET /api/ingestion/satellite/jobs/{job_id}`; this returns the validated upstream job body and does not submit a job.
 
 ### Common request fields
 
@@ -70,46 +63,17 @@ Runs the selected profile in a worker thread and keeps the HTTP request open unt
 | `run_job_id` | Yes | Non-empty orchestration/correlation identifier. UC3 also uses it as the package correlation ID. |
 | `triggered_at` | Yes | ISO 8601 datetime with a timezone offset. |
 | `provider` | Yes | Literal `sentinel-2`. |
-| `profile` | Yes | `forecaster-collector` or `coastal-uc3-sentinel2`. |
+| `profile` | Yes | `uc1-water-pollutants-collector`, `uc1-sperchios-river`, `uc1-sperchios-sea`, or `coastal-uc3-sentinel2`. |
 | `aoi_id` | Yes | Non-empty AOI identifier. UC3 additionally checks it against the configured authorised AOI registry. |
 | `bbox` | Yes | Four WGS84 numbers `[min_lon, min_lat, max_lon, max_lat]`; must be ordered and within longitude/latitude ranges. UC3 also checks it matches the registered AOI. |
 
 The outer request model permits extra fields by Pydantic's default behavior. The nested `uc3` object explicitly rejects unknown fields. UC1-only fields are not forwarded to the UC3 package.
 
-### UC1: `forecaster-collector`
+### UC1 satellite collector profile
 
-`run_name` is required for UC1. Other optional UC1 fields are:
+The `uc1-water-pollutants-collector` profile accepts optional `sensor` (`sentinel2` or `sentinel3`), `mode`, `history_start`, `target_date`, `max_days_per_run`, `max_tiles_per_run`, `discovery_chunk_days`, and `max_cloud_coverage`. Omitted options use upstream defaults: `sentinel2`, `auto`, `2016-01-01`, UTC today, 31 days and 30 percent, respectively. The limits default to null. The common `provider` remains `sentinel-2`; an explicit `sensor` selects the upstream sensor. AOI IDs must match `[a-z0-9][a-z0-9_-]*` and be at most 120 characters; run IDs are at most 200 characters. Discovery chunk days must be 1–366, cloud coverage an integer 0–100, and limits positive integers. It submits one job and polls it, preserving the original submission and latest job response.
 
-| Field | Default / constraints |
-|---|---|
-| `history_start` | `2016-01-01` |
-| `target_date` | Current UTC date when omitted |
-| `mode` | `auto`; allowed: `auto`, `backfill`, `incremental` |
-| `max_days_per_run` | Optional positive integer |
-| `max_tiles_per_run` | Optional positive integer |
-
-Example:
-
-```json
-{
-  "run_job_id": "job-sperchios-001",
-  "triggered_at": "2026-08-14T07:30:00+03:00",
-  "provider": "sentinel-2",
-  "profile": "forecaster-collector",
-  "aoi_id": "sperchios",
-  "bbox": [22.433493, 38.837552, 22.569555, 38.894223],
-  "run_name": "sperchios",
-  "history_start": "2016-01-01",
-  "target_date": "2026-08-14",
-  "mode": "auto",
-  "max_days_per_run": 1,
-  "max_tiles_per_run": 1
-}
-```
-
-Execution calls the installed `data_collection` collector with publication enabled. It discovers and collects the missing Sentinel-2 tile/date observations, processes them, and maintains local run/history/state outputs. For persistence it reads existing AOI observations and checkpoints from MongoDB, uploads/updates artifacts and metadata in MinIO/MongoDB, and writes its pipeline-run state. Exact provider calls and number of DB/object operations depend on the requested date range, missing observations, and persisted state; this is not a single fixed database query.
-
-UC1 result fields are those returned by the installed collector's `CollectionResult.to_dict()`. Common outcomes are `success`, `partial`, and `failed`.
+Unknown satellite request fields are rejected with HTTP 422. Save `collector_result.satellite_submission.job_id` and use the status endpoint above to recover a pending job. Polling retries transient availability failures at the configured interval up to three consecutive failures; it never retries submission. A client or proxy may disconnect before the wait expires, and this service does not persist the submission or provide durable orchestration. In that case recovery requires an ID obtained from the collector or its logs; do not blindly resubmit.
 
 ### UC3: `coastal-uc3-sentinel2`
 
@@ -160,7 +124,7 @@ The API wraps each adapter result in this application-owned envelope. `status` i
 {
   "run_job_id": "job-id",
   "provider": "sentinel-2",
-  "profile": "forecaster-collector",
+  "profile": "uc1-water-pollutants-collector",
   "aoi_id": "sperchios",
   "triggered_at": "2026-08-14T07:30:00+03:00",
   "started_at": "2026-08-14T04:30:01Z",
@@ -175,7 +139,7 @@ The API wraps each adapter result in this application-owned envelope. `status` i
 
 ### UC1 response
 
-The UC1 payload is `CollectionResult.to_dict()`. For example, a no-new-data run may return `status: "success"`, empty date lists, zero new records, and paths to its persisted history/state outputs. A run can also return `partial` or `failed`. Paths such as `outputs/sperchios/...` are worker-local paths, not necessarily downloadable API URLs.
+Satellite results contain `satellite_submission` and `satellite_collection`. Upstream `succeeded`, `partial`, and `failed` map to `success`, `partial`, and `failed`. A polling timeout or error returns `pending` with `reason` and the latest known job; the remote job is not cancelled or resubmitted. The embedded collector's previous inner result structure is no longer returned. River and sea results preserve their individual upstream responses.
 
 ### UC3 response
 
@@ -259,7 +223,7 @@ The application returns `{"detail":{"code":"...","message":"...","run_job_id":".
 | `503` | `collector_unavailable` | UC3 package/runtime cannot be imported or another explicitly unavailable dependency is detected. |
 | `500` | `collector_execution_error` | Unexpected collector error or invalid/inconsistent UC3 result. |
 
-UC1 storage preflight errors are mapped to `400` (configuration) or `503` (connection). UC3 configuration errors raised by the package are mapped to `400`; provider or storage failures represented as a valid UC3 result may instead produce HTTP `200` with `status: "failed"`. Unhandled failures outside the adapter's mapped exceptions use FastAPI's normal server-error handling.
+UC3 configuration errors raised by the package are mapped to `400`; provider or storage failures represented as a valid UC3 result may instead produce HTTP `200` with `status: "failed"`. Unhandled failures outside the adapter's mapped exceptions use FastAPI's normal server-error handling.
 
 Messages are sanitized for adapter execution failures. Validation messages may contain the invalid field/value supplied by the caller; never put credentials in request fields.
 
@@ -283,6 +247,6 @@ See [UC3 Integration Documentation](uc3-integration.md) for package installation
 {"run_job_id":"uc1-sea-001","triggered_at":"2026-11-03T07:00:00Z","provider":"sentinel-2","profile":"uc1-sperchios-sea","aoi_id":"sperchios","bbox":[22.433493,38.837552,22.569555,38.894223]}
 ```
 
-The existing response envelope contains `collector_result.status` and full upstream responses: `satellite_collection` for the satellite profile; `static_river_analysis`, `ecmwf_reanalysis`, `ecmwf_local_forecast` for river; and `static_marine_analysis`, `ifs_ingestion` for sea. A `queued` satellite job means submission succeeded, not collection completion. A Hydro Modeling failure after an earlier response returns HTTP 200 with `status: partial`, the completed responses, and an `error` containing `step`, `category`, and `message`. Earlier errors use the existing 400/503/500 error mapping. No automatic POST retries or satellite polling occur.
+The existing response envelope contains `collector_result.status` and full upstream responses: `satellite_collection` for the satellite profile; `static_river_analysis`, `ecmwf_reanalysis`, `ecmwf_local_forecast` for river; and `static_marine_analysis`, `ifs_ingestion` for sea. A `queued` satellite job means submission succeeded, not collection completion. A Hydro Modeling failure after an earlier response returns HTTP 200 with `status: partial`, the completed responses, and an `error` containing `step`, `category`, and `message`. Earlier errors use the existing 400/503/500 error mapping. No automatic POST retries occur; satellite status is polled until terminal or pending.
 
-The satellite profile accepts `sensor` (`sentinel2`), `mode`, `history_start`, `target_date`, `max_days_per_run`, `max_tiles_per_run`, `discovery_chunk_days`, and `max_cloud_coverage`. Its downstream job ID uses `uc1.collection.water-pollutants_<UTC date>_<hash>`, where the hash derives from the overall run ID. Reuse on the same date produces the same ID, but upstream idempotency is not guaranteed.
+The satellite profile accepts `sensor` (`sentinel2` or `sentinel3`), `mode`, `history_start`, `target_date`, `max_days_per_run`, `max_tiles_per_run`, `discovery_chunk_days`, and `max_cloud_coverage`. Its downstream job ID uses `uc1.collection.water-pollutants_<trigger UTC date>_<hash>`, where the hash derives from the overall run ID. Reuse of the same run ID and trigger date produces the same ID, but upstream idempotency is not guaranteed.

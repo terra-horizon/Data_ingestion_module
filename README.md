@@ -10,32 +10,14 @@ settings, see [UC3 integration](docs/docs/uc3-integration.md). Supply its wheel 
 before installing the application or building its Docker image.
 
 
-The collector is maintained in the
-[`uc1.forecaster.uth.alpha`](https://github.com/terra-horizon/uc1.forecaster.uth.alpha/tree/main/collector)
-repository. This application installs its `collector` subdirectory from a
-pinned Git commit as the `terra-data-collection` package. The collector owns
-CDSE discovery, river tiling, collection state, MongoDB persistence, and MinIO
-publication.
-
 ## UC1 data flow
 
 ```text
-Caller
-  -> POST /api/ingestion/run
-  -> Pydantic request validation
-  -> profile dispatcher
-  -> forecaster-collector adapter
-  -> externally maintained data_collection package
-     -> restore observations/state/tiles from MongoDB and MinIO
-     -> discover new Sentinel-2 dates through CDSE when required
-     -> collect tile/date statistics
-     -> update local staging files
-     -> publish documents to MongoDB and artifacts to MinIO
-  -> structured HTTP response
+TERRA Orchestrator -> Data Ingestion Module -> Satellite Water Pollutants Collector API
+                                                 -> independent collection worker -> MongoDB / MinIO
 ```
 
-The profiles are `forecaster-collector` (UC1) and `coastal-uc3-sentinel2` (UC3). Profiles are server-registered;
-callers cannot provide arbitrary Python process names.
+The four profiles are `uc1-water-pollutants-collector`, `uc1-sperchios-river`, `uc1-sperchios-sea`, and `coastal-uc3-sentinel2`. The satellite profile submits and monitors remote collector jobs; river and sea independently call Hydro Modeling. UC3 remains an independently installed package.
 
 ## Local setup
 
@@ -57,15 +39,13 @@ Windows PowerShell:
 .venv\Scripts\Activate.ps1
 ```
 
-Install the application and test dependencies. This also fetches and installs
-the pinned collector dependency from GitHub:
+Install the application and test dependencies:
 
 ```bash
 python -m pip install vendor/terra_wp2_uc3_ingestion-0.5.2-py3-none-any.whl -e ".[test]"
 ```
 
-Copy `.env.example` to `.env`, supply the required credentials and storage
-endpoints, then start the API:
+Copy `.env.example` to `.env`, supply the required remote service settings and UC3 configuration, then start the API:
 
 ```bash
 uvicorn app.main:app --reload --env-file .env
@@ -82,10 +62,9 @@ Send `POST /api/ingestion/run`:
   "run_job_id": "job-sperchios-20260814-001",
   "triggered_at": "2026-08-14T07:30:00+03:00",
   "provider": "sentinel-2",
-  "profile": "forecaster-collector",
+  "profile": "uc1-water-pollutants-collector",
   "aoi_id": "sperchios",
   "bbox": [22.433493, 38.837552, 22.569555, 38.894223],
-  "run_name": "sperchios",
   "history_start": "2016-01-01",
   "mode": "auto",
   "max_days_per_run": 1,
@@ -96,30 +75,13 @@ Send `POST /api/ingestion/run`:
 Use `tests_external/ingestion.http` to send the same request from an HTTP client
 that supports `.http` files.
 
-The response contains the caller's `run_job_id`, selected provider/profile,
-timings, overall status, and the serialized collector result. Paths inside
-`collector_result` refer to local staging paths in the API process or container;
-durable data is stored by the collector in MongoDB and MinIO.
+The response retains the request metadata and timings. For satellite collection, `collector_result.satellite_submission` contains the submission and `satellite_collection` contains the latest job response. Upstream `succeeded`, `partial`, and `failed` map to `success`, `partial`, and `failed`; a wait timeout or polling error returns `pending` and preserves the job ID.
+
+Save `collector_result.satellite_submission.job_id` and retrieve the latest upstream status with `GET /api/ingestion/satellite/jobs/{job_id}`. The request may outlast a client or proxy timeout; this service does not persist job IDs, so if the response is lost, obtain the ID from the collector before retrying. Upstream jobs are not cancelled when polling stops.
 
 ## Docker
 
-The application Compose file expects the existing `terra-network`,
-`terra-mongodb`, and `terra-minio` resources supplied by the local TERRA stack.
-Use container DNS names and internal ports in `.env`:
-
-```env
-MONGO_URI=mongodb://<user>:<url-encoded-password>@terra-mongodb:27017/terra_db?authSource=admin
-MINIO_ENDPOINT=http://terra-minio:9000
-```
-
-Start or rebuild the API container:
-
-```bash
-docker compose up --build -d
-```
-
-The API is exposed at <http://127.0.0.1:8000>. MinIO port `9000` is the S3 API;
-port `9001` is the browser console.
+Compose injects `.env` into the API container on the external `terra-network`. For the internal services set `UC1_COLLECTOR_BASE_URL=http://uc1-water-pollutants-collector:8000` and `UC1_HYDRO_BASE_URL=http://hydro-modeling-service:8000`. UC3 storage remains separately configured. Start with `docker compose up --build -d`; the main Compose file exposes port 18000 locally.
 
 ## Tests
 
@@ -139,12 +101,12 @@ Detailed architecture, API, configuration, deployment, workflow, and QA guides a
 
 ### UC1 Sperchios delegated profiles
 
-`uc1-water-pollutants-collector`, `uc1-sperchios-river` and `uc1-sperchios-sea` run through the same `POST /api/ingestion/run` endpoint. Supply the common request fields; none requires `run_name` or `uc3` options. For example, change `profile` among the three names:
+`uc1-water-pollutants-collector`, `uc1-sperchios-river` and `uc1-sperchios-sea` run through the same `POST /api/ingestion/run` endpoint. Supply the common request fields. For example, change `profile` among the three names:
 
 ```json
 {"run_job_id":"uc1-river-001","triggered_at":"2026-11-03T07:00:00Z","provider":"sentinel-2","profile":"uc1-sperchios-river","aoi_id":"sperchios","bbox":[22.433493,38.837552,22.569555,38.894223]}
 ```
 
-Set the `UC1_*` environment variables in `.env.example` in the application process. The base URLs include the collector and Hydro Modeling service prefixes; configure the static river and marine IDs from the respective service. The satellite profile submits a collection job. Independently, the river profile retrieves the configured river analysis, then runs reanalysis and a 15-day local forecast. The sea profile finds the configured marine analysis for the river, then runs a six-day ECMWF IFS ingestion. Steps run sequentially; Hydro Modeling owns persistence.
+Set the `UC1_*` environment variables in `.env.example` in the application process. Use external proxy prefixes for external URLs and no prefix for internal Docker URLs; configure the static river and marine IDs from the respective service. The satellite profile submits a collection job. Independently, the river profile retrieves the configured river analysis, then runs reanalysis and a 15-day local forecast. The sea profile finds the configured marine analysis for the river, then runs a six-day ECMWF IFS ingestion. Steps run sequentially; Hydro Modeling owns persistence.
 
-The satellite response is a job submission (`202`), not proof of completed collection; the workflow does not poll it. Successful upstream bodies are retained under `collector_result`. A later Hydro Modeling failure stops its sequence and returns HTTP 200 with `status: partial`, completed responses and an `error` with the failed step and category. Initial configuration, availability and execution failures use the existing 400, 503 and 500 error responses. Secrets echoed by upstream services are redacted. Run offline tests with `.venv\Scripts\python.exe -m pytest tests/test_uc1_profile.py` (or `python -m pytest` for the full suite).
+The satellite submission (`202`) is followed by polling until a terminal result or the configured wait limit. Successful upstream bodies are retained under `collector_result`. A later Hydro Modeling failure stops its sequence and returns HTTP 200 with `status: partial`, completed responses and an `error` with the failed step and category. Initial configuration, availability and execution failures use the existing 400, 503 and 500 error responses. Secrets echoed by upstream services are redacted. Run offline tests with `.venv\Scripts\python.exe -m pytest tests/test_uc1_profile.py` (or `python -m pytest` for the full suite).

@@ -2,7 +2,7 @@ from datetime import datetime, timezone
 from hashlib import sha256
 import httpx
 import pytest
-from app.adapters.collector import CollectorConfigurationError, CollectorUnavailableError
+from app.adapters.common import CollectorConfigurationError, CollectorUnavailableError
 from app.adapters.uc1 import run_uc1_river_adapter, run_uc1_sea_adapter, run_uc1_water_pollutants_adapter
 from app.schemas.ingestion import IngestionRunRequest
 from app.services.ingestion import PROFILE_RUNNERS
@@ -14,10 +14,9 @@ def settings(monkeypatch):
     for key, value in {"UC1_COLLECTOR_BASE_URL": "https://collector.test/prefix", "UC1_COLLECTOR_API_KEY": "secret1", "UC1_HYDRO_BASE_URL": "https://hydro.test/prefix", "UC1_HYDRO_API_KEY": "secret2", "UC1_SPERCHIOS_ANALYSIS_AREA_ID": "river", "UC1_SPERCHIOS_MARINE_ANALYSIS_AREA_ID": "sea"}.items():
         monkeypatch.setenv(key, value)
 
-@pytest.mark.parametrize("profile", ["uc1-water-pollutants-collector", "uc1-sperchios-river", "uc1-sperchios-sea", "coastal-uc3-sentinel2", "forecaster-collector"])
+@pytest.mark.parametrize("profile", ["uc1-water-pollutants-collector", "uc1-sperchios-river", "uc1-sperchios-sea", "coastal-uc3-sentinel2"])
 def test_profiles(profile):
     data = {**REQUEST, "profile": profile}
-    if profile == "forecaster-collector": data["run_name"] = "test"
     if profile == "coastal-uc3-sentinel2": data["uc3"] = {"contract_version": 2, "mode": "window", "time_from": "2026-01-01T00:00:00Z", "time_to": "2026-01-02T00:00:00Z"}
     assert IngestionRunRequest.model_validate(data).profile == profile
     assert profile in PROFILE_RUNNERS
@@ -35,6 +34,7 @@ def test_exact_calls_and_payloads(settings, monkeypatch, profile):
         calls.append((method, url, kwargs))
         path = httpx.URL(url).path
         if path.endswith('/jobs'): body = {"job_id": "job", "status": "queued", "extra": 1}
+        elif path.endswith('/jobs/job'): body = {"job_id": "job", "status": "succeeded", "extra": 1}
         elif path.endswith('/river-analyses/river'): body = {"analysis_area_id": "river", "extra": 2}
         elif path.endswith('/marine-analyses'): body = {"count": 2, "analyses": [{"marine_analysis_area_id": "other", "river_analysis_area_id": "river"}, {"marine_analysis_area_id": "sea", "river_analysis_area_id": "river", "extra": 3}], "metadata": "preserved"}
         else: body = {"status": "success", "dataset": "test", "extra": 4, **({"marine_analysis_area_id": "sea"} if profile == 'sea' else {"analysis_area_id": "river"})}
@@ -43,12 +43,13 @@ def test_exact_calls_and_payloads(settings, monkeypatch, profile):
     runner = {'satellite': run_uc1_water_pollutants_adapter, 'river': run_uc1_river_adapter, 'sea': run_uc1_sea_adapter}[profile]
     result = runner(REQUEST)
     assert result['status'] == 'success'
-    expected = {'satellite': [('POST', '/api/collection/jobs')], 'river': [('GET', '/static/river-analyses/river'), ('POST', '/data-ingestion/ecmwf/reanalysis'), ('POST', '/data-ingestion/ecmwf/local-forecast')], 'sea': [('GET', '/static/marine-analyses'), ('POST', '/data-ingestion/ifs')]}
+    expected = {'satellite': [('POST', '/api/collection/jobs'), ('GET', '/api/collection/jobs/job')], 'river': [('GET', '/static/river-analyses/river'), ('POST', '/data-ingestion/ecmwf/reanalysis'), ('POST', '/data-ingestion/ecmwf/local-forecast')], 'sea': [('GET', '/static/marine-analyses'), ('POST', '/data-ingestion/ifs')]}
     assert [(method, url.split('/prefix')[-1]) for method, url, _ in calls] == expected[profile]
     today = datetime.now(timezone.utc).date().isoformat()
     if profile == 'satellite':
-        assert calls[0][2]['json'] == {'run_job_id': f'uc1.collection.water-pollutants_{today}_{sha256(b"overall").hexdigest()[:24]}', 'triggered_at': REQUEST['triggered_at'], 'aoi_id': 'sperchios', 'bbox': REQUEST['bbox'], 'sensor': 'sentinel2', 'mode': 'auto'}
-        assert result['satellite_collection'] == {'job_id': 'job', 'status': 'queued', 'extra': 1}
+        assert calls[0][2]['json'] == {'run_job_id': f'uc1.collection.water-pollutants_2026-11-03_{sha256(b"overall").hexdigest()[:24]}', 'triggered_at': REQUEST['triggered_at'], 'aoi_id': 'sperchios', 'bbox': REQUEST['bbox']}
+        assert result['satellite_submission'] == {'job_id': 'job', 'status': 'queued', 'extra': 1}
+        assert result['satellite_collection']['status'] == 'succeeded'
     elif profile == 'sea':
         assert calls[0][2]['params'] == {'river_analysis_area_id': 'river'}
         assert calls[1][2]['json'] == {'marine_analysis_area_id': 'sea', 'action_date': today, 'horizon_days': 6, 'source': 'ecmwf'}
@@ -78,7 +79,7 @@ def test_failures_stop_and_preserve(settings, monkeypatch, failure):
     elif failure in ('auth', 'missing'):
         with pytest.raises(CollectorConfigurationError): run_uc1_river_adapter(REQUEST)
     elif failure == 'invalid':
-        from app.adapters.collector import CollectorExecutionError
+        from app.adapters.common import CollectorExecutionError
         with pytest.raises(CollectorExecutionError): run_uc1_river_adapter(REQUEST)
     else:
         result = run_uc1_river_adapter(REQUEST)
@@ -196,6 +197,8 @@ async def test_satellite_options_and_unique_stable_job_ids(settings, monkeypatch
     from app.main import app
     calls = []
     def request(self, method, url, **kwargs):
+        if method == 'GET':
+            return httpx.Response(200, json={'job_id': 'job', 'status': 'succeeded', 'metadata': {'keep': True}})
         calls.append(kwargs['json'])
         return httpx.Response(202, json={'job_id': 'job', 'status': 'queued', 'metadata': {'keep': True}})
     monkeypatch.setattr(httpx.Client, 'request', request)
@@ -213,7 +216,7 @@ async def test_satellite_options_and_unique_stable_job_ids(settings, monkeypatch
 
 @pytest.mark.parametrize('status', [400, 401, 403, 404, 422, 500, 503])
 def test_upstream_http_errors(settings, monkeypatch, status):
-    from app.adapters.collector import CollectorAdapterError
+    from app.adapters.common import CollectorAdapterError
     calls = []
     def request(self, method, url, **kwargs):
         calls.append(url)
@@ -256,9 +259,9 @@ def test_ingestion_failure_stops_forecast(settings, monkeypatch, status):
     assert result['status'] == 'partial' and result['error']['step'] == 'ecmwf_reanalysis'
     assert result['ecmwf_reanalysis']['status'] == status and len(calls) == 2
 
-@pytest.mark.parametrize('body', [{'job_id': 'job', 'status': 'failed'}, {'status': 'queued'}, [], {'job_id': 'job', 'status': 'unknown'}])
+@pytest.mark.parametrize('body', [{'status': 'queued'}, [], {'job_id': 'job', 'status': 'unknown'}])
 def test_invalid_satellite_submission(settings, monkeypatch, body):
-    from app.adapters.collector import CollectorExecutionError
+    from app.adapters.common import CollectorExecutionError
     monkeypatch.setattr(httpx.Client, 'request', lambda *args, **kwargs: httpx.Response(202, json=body))
     with pytest.raises(CollectorExecutionError):
         run_uc1_water_pollutants_adapter(REQUEST)
@@ -286,3 +289,173 @@ def test_invalid_marine_envelope_stops_ifs(settings, monkeypatch, body):
     assert result['error']['step'] == 'static_marine_analysis'
     assert result['static_marine_analysis'] == body
     assert len(calls) == 1
+
+@pytest.mark.parametrize('statuses,expected', [
+    (['queued', 'running', 'succeeded'], 'success'),
+    (['queued', 'partial'], 'partial'),
+    (['running', 'failed'], 'failed'),
+])
+def test_satellite_polling_terminal_states(settings, monkeypatch, statuses, expected):
+    calls = []
+    remaining = iter(statuses)
+    monkeypatch.setattr('app.adapters.uc1.sleep', lambda seconds: None)
+    def request(self, method, url, **kwargs):
+        calls.append((method, url, kwargs))
+        if method == 'POST':
+            return httpx.Response(202, json={'job_id': 'job', 'status': 'queued', 'aoi_id': 'sperchios', 'run_job_id': kwargs['json']['run_job_id']})
+        return httpx.Response(200, json={'job_id': 'job', 'status': next(remaining), 'aoi_id': 'sperchios', 'run_job_id': calls[0][2]['json']['run_job_id'], 'result': {'extra': 'preserved'}, 'error': None})
+    monkeypatch.setattr(httpx.Client, 'request', request)
+    result = run_uc1_water_pollutants_adapter(REQUEST)
+    assert result['status'] == expected
+    assert result['satellite_submission']['status'] == 'queued'
+    assert result['satellite_collection']['result'] == {'extra': 'preserved'}
+    assert [c[0] for c in calls] == ['POST'] + ['GET'] * len(statuses)
+    assert all(c[2]['headers']['X-API-Key'] == 'secret1' for c in calls)
+
+
+def test_satellite_poll_timeout_preserves_latest_job(settings, monkeypatch):
+    monkeypatch.setenv('UC1_COLLECTOR_MAX_WAIT_SECONDS', '1')
+    ticks = iter([0, 0, 2, 2])
+    monkeypatch.setattr('app.adapters.uc1.monotonic', lambda: next(ticks))
+    calls = []
+    def request(self, method, url, **kwargs):
+        calls.append(method)
+        return httpx.Response(202 if method == 'POST' else 200, json={'job_id': 'job', 'status': 'queued' if method == 'POST' else 'running'})
+    monkeypatch.setattr(httpx.Client, 'request', request)
+    result = run_uc1_water_pollutants_adapter(REQUEST)
+    assert result['status'] == 'pending' and result['reason'] == 'poll_timeout'
+    assert result['satellite_collection']['status'] == 'running'
+    assert calls == ['POST', 'GET']
+
+
+@pytest.mark.parametrize('failure', ['auth', 'unavailable', 'json', 'status', 'job_id', 'metadata', 'connection'])
+def test_satellite_poll_failure_preserves_submission(settings, monkeypatch, failure):
+    calls = []
+    monkeypatch.setattr('app.adapters.uc1.sleep', lambda seconds: None)
+    def request(self, method, url, **kwargs):
+        calls.append(method)
+        if method == 'POST': return httpx.Response(202, json={'job_id': 'job', 'status': 'queued', 'aoi_id': 'sperchios'})
+        if failure == 'auth': return httpx.Response(401)
+        if failure == 'unavailable': return httpx.Response(503)
+        if failure == 'json': return httpx.Response(200, text='bad')
+        if failure == 'connection': raise httpx.ConnectError('secret1')
+        body = {'job_id': 'job', 'status': 'running', 'aoi_id': 'sperchios'}
+        if failure == 'status': body['status'] = 'unknown'
+        if failure == 'job_id': body['job_id'] = 'other'
+        if failure == 'metadata': body['aoi_id'] = 'other'
+        return httpx.Response(200, json=body)
+    monkeypatch.setattr(httpx.Client, 'request', request)
+    result = run_uc1_water_pollutants_adapter(REQUEST)
+    assert result['status'] == 'pending' and result['reason'] == 'poll_error'
+    assert result['satellite_submission']['job_id'] == 'job'
+    assert 'secret1' not in str(result)
+    assert calls == ['POST'] + ['GET'] * (3 if failure in ('unavailable', 'connection') else 1)
+
+
+def test_transient_poll_failure_recovers_without_resubmission(settings, monkeypatch):
+    calls = []
+    monkeypatch.setattr('app.adapters.uc1.sleep', lambda seconds: None)
+    def request(self, method, url, **kwargs):
+        calls.append(method)
+        if method == 'POST':
+            return httpx.Response(202, json={'job_id': 'job', 'status': 'queued'})
+        if calls.count('GET') == 1:
+            return httpx.Response(503)
+        return httpx.Response(200, json={'job_id': 'job', 'status': 'succeeded', 'result': {'value': 1}})
+    monkeypatch.setattr(httpx.Client, 'request', request)
+    result = run_uc1_water_pollutants_adapter(REQUEST)
+    assert result['status'] == 'success' and result['satellite_collection']['result'] == {'value': 1}
+    assert calls == ['POST', 'GET', 'GET']
+
+
+@pytest.mark.asyncio
+async def test_satellite_status_endpoint(settings, monkeypatch):
+    from app.main import app
+    calls = []
+    def request(self, method, url, **kwargs):
+        calls.append((method, url, kwargs['headers']['X-API-Key']))
+        return httpx.Response(200, json={'job_id': 'job', 'status': 'failed', 'error': {'detail': 'failure'}})
+    monkeypatch.setattr(httpx.Client, 'request', request)
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url='http://test') as client:
+        response = await client.get('/api/ingestion/satellite/jobs/job')
+    assert response.status_code == 200
+    assert response.json()['error'] == {'detail': 'failure'}
+    assert calls == [('GET', 'https://collector.test/prefix/api/collection/jobs/job', 'secret1')]
+
+
+@pytest.mark.asyncio
+async def test_unknown_satellite_field_rejected():
+    from app.main import app
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url='http://test') as client:
+        response = await client.post('/api/ingestion/run', json={**REQUEST, 'profile': 'uc1-water-pollutants-collector', 'unsupported': 1})
+    assert response.status_code == 422
+    assert 'Unsupported satellite request fields' in response.text
+
+@pytest.mark.parametrize('value', ['0', '-1', 'nan', 'invalid'])
+def test_invalid_poll_settings(settings, monkeypatch, value):
+    monkeypatch.setenv('UC1_COLLECTOR_MAX_WAIT_SECONDS', value)
+    with pytest.raises(CollectorConfigurationError): run_uc1_water_pollutants_adapter(REQUEST)
+
+def test_app_imports_without_embedded_collector():
+    import subprocess
+    import sys
+    source = """import builtins
+original = builtins.__import__
+def checked(name, *args, **kwargs):
+    if name == 'data_collection' or name.startswith('data_collection.'):
+        raise ImportError('embedded collector forbidden')
+    return original(name, *args, **kwargs)
+builtins.__import__ = checked
+import app.main
+import wp2_uc3_ingestion
+"""
+    result = subprocess.run([sys.executable, '-c', source], capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
+
+
+def test_satellite_sensor3_is_forwarded(settings, monkeypatch):
+    calls = []
+    def request(self, method, url, **kwargs):
+        if method == 'POST':
+            calls.append(kwargs['json'])
+            return httpx.Response(202, json={'job_id': 'job', 'status': 'queued'})
+        return httpx.Response(200, json={'job_id': 'job', 'status': 'succeeded'})
+    monkeypatch.setattr(httpx.Client, 'request', request)
+    config = {**REQUEST, 'sensor': 'sentinel3'}
+    assert run_uc1_water_pollutants_adapter(config)['status'] == 'success'
+    assert calls[0]['sensor'] == 'sentinel3'
+
+
+def test_exactly_four_profiles_are_registered():
+    from typing import get_args
+    from app.schemas.ingestion import IngestionProfile
+    from app.services.ingestion import PROFILE_RUNNERS
+    expected = {'uc1-water-pollutants-collector', 'uc1-sperchios-river', 'uc1-sperchios-sea', 'coastal-uc3-sentinel2'}
+    assert set(PROFILE_RUNNERS) == set(get_args(IngestionProfile)) == expected
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('override', [
+    {'aoi_id': 'Sperchios'}, {'aoi_id': 'x' * 121}, {'aoi_id': '-invalid'},
+    {'run_job_id': 'x' * 201}, {'discovery_chunk_days': 367},
+    {'discovery_chunk_days': 0}, {'discovery_chunk_days': 1.5},
+    {'max_cloud_coverage': 30.5}, {'max_cloud_coverage': 101},
+    {'max_days_per_run': True}, {'max_tiles_per_run': '2'}, {'run_name': 'old'},
+    {'bbox': ['22.4', 38.8, 22.5, 38.9]}, {'bbox': [False, 38.8, 22.5, 38.9]},
+])
+async def test_invalid_satellite_contract_rejected(override):
+    from app.main import app
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url='http://test') as client:
+        response = await client.post('/api/ingestion/run', json={**REQUEST, 'profile': 'uc1-water-pollutants-collector', **override})
+    assert response.status_code == 422
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('upstream,expected', [(404, 404), (401, 400), (503, 503)])
+async def test_status_endpoint_upstream_errors(settings, monkeypatch, upstream, expected):
+    from app.main import app
+    monkeypatch.setattr(httpx.Client, 'request', lambda *args, **kwargs: httpx.Response(upstream, text='secret1'))
+    async with httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url='http://test') as client:
+        response = await client.get('/api/ingestion/satellite/jobs/job')
+    assert response.status_code == expected
+    assert 'secret1' not in response.text

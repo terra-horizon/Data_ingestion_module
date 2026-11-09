@@ -12,8 +12,7 @@ class LivenessResponse(BaseModel):
 
 class ReadinessChecks(BaseModel):
     configuration: HealthCheckStatus
-    mongodb: HealthCheckStatus
-    minio: HealthCheckStatus
+    collector: HealthCheckStatus
 
 
 class ReadinessResponse(BaseModel):
@@ -21,8 +20,11 @@ class ReadinessResponse(BaseModel):
     checks: ReadinessChecks
 
 
-class Uc3ReadinessChecks(ReadinessChecks):
+class Uc3ReadinessChecks(BaseModel):
     package: HealthCheckStatus
+    configuration: HealthCheckStatus
+    mongodb: HealthCheckStatus
+    minio: HealthCheckStatus
 
 
 class Uc3ReadinessResponse(BaseModel):

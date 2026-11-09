@@ -6,7 +6,7 @@ ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends ca-certificates git libexpat1 \
+    && apt-get install -y --no-install-recommends ca-certificates libexpat1 \
     && rm -rf /var/lib/apt/lists/*
 
 COPY vendor/terra_wp2_uc3_ingestion-0.5.2-py3-none-any.whl /tmp/uc3/

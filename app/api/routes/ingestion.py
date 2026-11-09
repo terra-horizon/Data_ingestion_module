@@ -2,11 +2,14 @@ from datetime import datetime, timezone
 from time import perf_counter
 
 from fastapi import APIRouter, HTTPException, status
+from starlette.concurrency import run_in_threadpool
+from app.adapters.uc1 import get_satellite_job
 
-from app.adapters.collector import (
+from app.adapters.common import (
     CollectorAlreadyRunningError,
     CollectorConfigurationError,
     CollectorExecutionError,
+    CollectorJobNotFoundError,
     CollectorUnavailableError,
 )
 from app.schemas.ingestion import IngestionRunRequest, IngestionRunResponse
@@ -14,6 +17,21 @@ from app.services.ingestion import execute_ingestion_profile
 
 
 router = APIRouter(prefix="/ingestion", tags=["ingestion"])
+
+
+@router.get("/satellite/jobs/{job_id}")
+async def satellite_job_status(job_id: str) -> dict:
+    """Retrieve a previously submitted collector job without submitting another."""
+    try:
+        return await run_in_threadpool(get_satellite_job, job_id)
+    except CollectorJobNotFoundError as exc:
+        raise HTTPException(status_code=404, detail={"code": "collector_job_not_found", "message": str(exc)}) from exc
+    except CollectorConfigurationError as exc:
+        raise HTTPException(status_code=400, detail={"code": "collector_configuration_error", "message": str(exc)}) from exc
+    except CollectorUnavailableError as exc:
+        raise HTTPException(status_code=503, detail={"code": "collector_unavailable", "message": str(exc)}) from exc
+    except CollectorExecutionError as exc:
+        raise HTTPException(status_code=502, detail={"code": "collector_execution_error", "message": str(exc)}) from exc
 
 
 @router.post("/run", response_model=IngestionRunResponse)

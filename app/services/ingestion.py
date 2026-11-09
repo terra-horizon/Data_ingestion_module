@@ -3,7 +3,6 @@ from typing import Any
 
 from starlette.concurrency import run_in_threadpool
 
-from app.adapters.collector import run_sentinel_ingestion
 from app.adapters.uc3 import run_uc3_adapter
 from app.adapters.uc1 import run_uc1_river_adapter, run_uc1_sea_adapter, run_uc1_water_pollutants_adapter
 from app.schemas.ingestion import IngestionProfile, IngestionRunRequest
@@ -12,7 +11,6 @@ from app.schemas.ingestion import IngestionProfile, IngestionRunRequest
 ProfileRunner = Callable[[Mapping[str, Any]], dict[str, Any]]
 
 PROFILE_RUNNERS: dict[IngestionProfile, ProfileRunner] = {
-    "forecaster-collector": run_sentinel_ingestion,
     "coastal-uc3-sentinel2": run_uc3_adapter,
     "uc1-water-pollutants-collector": run_uc1_water_pollutants_adapter,
     "uc1-sperchios-river": run_uc1_river_adapter,

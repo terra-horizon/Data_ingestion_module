@@ -9,7 +9,6 @@ site_dir: site
 nav:
   - Overview: index.md
   - System:
-    - Architecture: architecture.md
     - API Reference: api-reference.md
     - Workflow: workflow.md
     - Collector Package Transition: collector-package-transition-guide.md
@@ -18,7 +17,6 @@ nav:
     - Configuration: configuration.md
     - UC3 Integration: uc3-integration.md
     - Quality Assurance: qa.md
-    - Pipeline Test Scenarios: pipeline-test-scenarios.md
   - Operations:
     - FAQ: faq.md
   - License: license.md

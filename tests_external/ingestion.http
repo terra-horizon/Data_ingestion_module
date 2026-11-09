@@ -1,142 +1,29 @@
-@baseUrl = http://127.0.0.1:18000
+@localUrl = http://127.0.0.1:8000
+@productionUrl = https://server.iprism.eu/data-ingestion
+@baseUrl = {{localUrl}}
+@jobId = af26fdb5b1a7432c8810cda57d5b98a2
 
-### Run Sentinel-2 ingestion for Sperchios
-POST {{baseUrl}}/api/ingestion/run
+### READ ONLY: retrieve a previously submitted satellite job
+GET {{productionUrl}}/api/ingestion/satellite/jobs/{{jobId}}
+Accept: application/json
+
+### WRITES DATA: submits a real satellite job; productionUrl targets production from SSH
+POST {{productionUrl}}/api/ingestion/run
 Content-Type: application/json
 Accept: application/json
 
 {
-  "run_job_id": "job-sperchios-20260811-001",
-  "triggered_at": "2026-08-11T10:00:00Z",
+  "run_job_id": "uc1-satellite-example-20261109-001",
+  "triggered_at": "2026-11-09T09:00:00Z",
   "provider": "sentinel-2",
-  "profile": "forecaster-collector",
+  "profile": "uc1-water-pollutants-collector",
   "aoi_id": "sperchios",
-  "bbox": [
-    22.433493,
-    38.837552,
-    22.569555,
-    38.894223
-  ],
-  "run_name": "sperchios",
-  "history_start": "2026-10-10",
+  "bbox": [22.433493, 38.837552, 22.569555, 38.894223],
+  "sensor": "sentinel2",
   "mode": "auto",
-  "max_days_per_run": 1,
-  "max_tiles_per_run": 1
-}
-
-### Process one queued date across all remaining tiles
-POST {{baseUrl}}/api/ingestion/run
-Content-Type: application/json
-Accept: application/json
-
-{
-  "run_job_id": "job-sperchios-20260826-all-tiles",
-  "triggered_at": "2026-08-26T12:00:00+03:00",
-  "provider": "sentinel-2",
-  "profile": "forecaster-collector",
-  "aoi_id": "sperchios",
-  "bbox": [
-    22.433493,
-    38.837552,
-    22.569555,
-    38.894223
-  ],
-  "run_name": "sperchios",
   "history_start": "2016-01-01",
-  "target_date": "2026-08-26",
-  "mode": "auto",
-  "max_days_per_run": 1
-}
-
-### Run unrestricted ingestion for Sperchios v7
-POST {{baseUrl}}/api/ingestion/run
-Content-Type: application/json
-Accept: application/json
-
-{
-  "run_job_id": "job-sperchios-v7-20260826",
-  "triggered_at": "2026-08-27T09:00:00+03:00",
-  "provider": "sentinel-2",
-  "profile": "forecaster-collector",
-  "aoi_id": "sperchios_e2e_v1",
-  "bbox": [
-    22.433493,
-    38.837552,
-    22.569555,
-    38.894223
-  ],
-  "run_name": "sperchios_e2e_v1",
-  "history_start": "2026-01-01",
-  "mode": "auto"
-}
-
-### Run a fresh single-day, single-tile ingestion for Sperchios v4
-POST {{baseUrl}}/api/ingestion/run
-Content-Type: application/json
-Accept: application/json
-
-{
-  "run_job_id": "job-sperchios-v4-20260826",
-  "triggered_at": "2026-08-26T12:00:00+03:00",
-  "provider": "sentinel-2",
-  "profile": "forecaster-collector",
-  "aoi_id": "sperchios_v5",
-  "bbox": [
-    22.433493,
-    38.837552,
-    22.569555,
-    38.894223
-  ],
-  "run_name": "sperchios_v5",
-  "history_start": "2026-07-01",
-  "mode": "auto",
   "max_days_per_run": 1,
-  "max_tiles_per_run": 1
-}
-
-### Process one queued date across all remaining tiles
-
-POST {{baseUrl}}/api/ingestion/run
-Content-Type: application/json
-Accept: application/json
-
-{
-  "run_job_id": "job-sperchios-20260827",
-  "triggered_at": "2026-08-27T09:00:00+03:00",
-  "provider": "sentinel-2",
-  "profile": "forecaster-collector",
-  "aoi_id": "sperchios_v3",
-  "bbox": [
-    22.433493,
-    38.837552,
-    22.569555,
-    38.894223
-  ],
-  "run_name": "sperchios_v3",
-  "history_start": "2026-08-01",
-  "mode": "auto",
-  "max_days_per_run": 1
-}
-
-### Live testing of data ingestion endpoint on the production server
-POST https://server.iprism.eu/data-ingestion/api/ingestion/run
-Content-Type: application/json
-Accept: application/json
-
-{
-  "run_job_id": "job-sperchios-20260827",
-  "triggered_at": "2026-08-27T09:00:00+03:00",
-  "provider": "sentinel-2",
-  "profile": "forecaster-collector",
-  "aoi_id": "live_sperchios_v1",
-  "bbox": [
-    22.433493,
-    38.837552,
-    22.569555,
-    38.894223
-  ],
-  "run_name": "live_sperchios_v1",
-  "history_start": "2026-09-01",
-  "mode": "auto",
-  "max_days_per_run": 1
+  "max_tiles_per_run": 1,
+  "discovery_chunk_days": 31,
+  "max_cloud_coverage": 30
 }
