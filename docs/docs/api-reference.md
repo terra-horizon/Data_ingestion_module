@@ -69,11 +69,698 @@ Runs the selected profile in a worker thread and keeps the HTTP request open unt
 
 The outer request model permits extra fields by Pydantic's default behavior. The nested `uc3` object explicitly rejects unknown fields. UC1-only fields are not forwarded to the UC3 package.
 
-### UC1 satellite collector profile
+### UC1 Satellite Water Pollutants Collection
 
-The `uc1-water-pollutants-collector` profile accepts optional `sensor` (`sentinel2` or `sentinel3`), `mode`, `history_start`, `target_date`, `max_days_per_run`, `max_tiles_per_run`, `discovery_chunk_days`, and `max_cloud_coverage`. Omitted options use upstream defaults: `sentinel2`, `auto`, `2016-01-01`, UTC today, 31 days and 30 percent, respectively. The limits default to null. The common `provider` remains `sentinel-2`; an explicit `sensor` selects the upstream sensor. AOI IDs must match `[a-z0-9][a-z0-9_-]*` and be at most 120 characters; run IDs are at most 200 characters. Discovery chunk days must be 1–366, cloud coverage an integer 0–100, and limits positive integers. It submits one job and polls it, preserving the original submission and latest job response.
+Profile:
 
-Unknown satellite request fields are rejected with HTTP 422. Save `collector_result.satellite_submission.job_id` and use the status endpoint above to recover a pending job. Polling retries transient availability failures at the configured interval up to three consecutive failures; it never retries submission. A client or proxy may disconnect before the wait expires, and this service does not persist the submission or provide durable orchestration. In that case recovery requires an ID obtained from the collector or its logs; do not blindly resubmit.
+`uc1-water-pollutants-collector`
+
+The Data Ingestion Module delegates satellite water pollutants collection to the external TERRA UC1 Satellite Water Pollutants Collector microservice.
+
+Unlike the Hydro Modeling workflows, satellite collection is executed asynchronously by the external service.
+
+The Data Ingestion Module is responsible for:
+
+1. Validating the incoming ingestion request.
+2. Constructing the Collector API request.
+3. Submitting the collection job.
+4. Monitoring the remote job until completion or timeout.
+5. Returning the final or latest available job result.
+
+The Data Ingestion Module does not execute the embedded UC1 Collector Python package.
+
+The legacy `forecaster-collector` profile has been removed.
+
+---
+
+#### 1. Service Configuration
+
+The integration requires:
+
+| Environment Variable | Description |
+|---|---|
+| `UC1_COLLECTOR_BASE_URL` | Satellite Collector service URL |
+| `UC1_COLLECTOR_API_KEY` | Authentication key for the Collector API |
+| `UC1_COLLECTOR_POLL_INTERVAL_SECONDS` | Interval between job-status requests |
+| `UC1_COLLECTOR_MAX_WAIT_SECONDS` | Maximum duration for waiting on job completion |
+
+The actual supported polling configuration names and defaults should be confirmed against the deployed application settings.
+
+---
+
+#### 3. Satellite Collection Request
+
+POST /api/ingestion/run
+
+Example:
+
+```json
+{
+  "run_job_id": "uc1-satellite-example-20261109-001",
+  "triggered_at": "2026-11-09T09:00:00Z",
+  "provider": "sentinel-2",
+  "profile": "uc1-water-pollutants-collector",
+  "aoi_id": "sperchios",
+  "bbox": [
+    22.433493,
+    38.837552,
+    22.569555,
+    38.894223
+  ]
+}
+```
+
+The `profile` determines the collection workflow.
+
+The common `provider` remains `sentinel-2`.
+
+The upstream Collector supports both Sentinel-2 and Sentinel-3, selected using the optional `sensor` field.
+
+---
+
+#### 4. Supported Collection Options
+
+The following optional parameters are supported:
+
+| Parameter | Type | Default | Description |
+|---|---|---|---|
+| `sensor` | string | `sentinel2` | Satellite sensor: `sentinel2` or `sentinel3` |
+| `mode` | string | `auto` | Collection mode |
+| `history_start` | date | `2016-01-01` | Beginning of historical collection |
+| `target_date` | date/null | UTC today | Inclusive collection cutoff |
+| `max_days_per_run` | integer/null | null | Maximum days processed per run |
+| `max_tiles_per_run` | integer/null | null | Maximum tiles processed per run |
+| `discovery_chunk_days` | integer | 31 | Size of discovery windows |
+| `max_cloud_coverage` | integer | 30 | Maximum cloud coverage percentage |
+
+Supported collection modes:
+
+- `auto`
+- `backfill`
+- `incremental`
+
+Validation constraints:
+
+- AOI identifiers must match `^[a-z0-9][a-z0-9_-]*$`.
+- AOI identifiers must contain at most 120 characters.
+- Collector run identifiers must contain at most 200 characters.
+- Bounding boxes must contain four ordered WGS84 coordinates.
+- `max_days_per_run` and `max_tiles_per_run` must be positive when supplied.
+- `discovery_chunk_days` must be between 1 and 366.
+- `max_cloud_coverage` must be between 0 and 100.
+
+Unsupported satellite request fields are rejected with HTTP 422.
+
+Example with optional parameters:
+
+```json
+{
+  "run_job_id": "uc1-satellite-custom-20261109-001",
+  "triggered_at": "2026-11-09T09:00:00Z",
+  "provider": "sentinel-2",
+  "profile": "uc1-water-pollutants-collector",
+  "aoi_id": "sperchios",
+  "bbox": [
+    22.433493,
+    38.837552,
+    22.569555,
+    38.894223
+  ],
+  "sensor": "sentinel2",
+  "mode": "incremental",
+  "history_start": "2016-01-01",
+  "target_date": "2026-11-09",
+  "max_days_per_run": 30,
+  "max_tiles_per_run": 100,
+  "discovery_chunk_days": 31,
+  "max_cloud_coverage": 30
+}
+```
+
+These optional limits can change how much data is processed.
+
+---
+
+#### 6. Successful Production Response
+
+The following response summarizes an actual successful live
+integration test performed on November 9, 2026.
+
+HTTP 200 OK
+
+```json
+{
+  "run_job_id": "uc1-satellite-example-20261109-001",
+  "provider": "sentinel-2",
+  "profile": "uc1-water-pollutants-collector",
+  "aoi_id": "sperchios",
+  "triggered_at": "2026-11-09T09:00:00Z",
+  "started_at": "2026-11-09T08:39:51.779202Z",
+  "completed_at": "2026-11-09T08:42:51.924752Z",
+  "duration_ms": 180146,
+  "status": "success",
+  "collector_result": {
+    "status": "success",
+    "satellite_submission": {
+      "job_id": "3c16420e507f448ea01a13f71267db3e",
+      "run_job_id": "uc1.collection.water-pollutants_2026-11-09_2a6433e4da888ee42c64efcf",
+      "aoi_id": "sperchios",
+      "sensor": "sentinel2",
+      "target_date": "2026-11-09",
+      "status": "queued",
+      "submitted_at": "2026-11-09T08:39:51Z"
+    },
+    "satellite_collection": {
+      "job_id": "3c16420e507f448ea01a13f71267db3e",
+      "run_job_id": "uc1.collection.water-pollutants_2026-11-09_2a6433e4da888ee42c64efcf",
+      "aoi_id": "sperchios",
+      "sensor": "sentinel2",
+      "target_date": "2026-11-09",
+      "status": "succeeded",
+      "submitted_at": "2026-11-09T08:39:51Z",
+      "started_at": "2026-11-09T08:39:52Z",
+      "completed_at": "2026-11-09T08:42:49Z",
+      "result": {
+        "status": "success",
+        "run_dir": "/app/outputs/sperchios",
+        "run_summary": "No new satellite data required collection; latest available observation is 2026-10-21.",
+        "mode": "auto",
+        "available_dates": [],
+        "missing_dates": [],
+        "collected_dates": [],
+        "new_record_count": 0,
+        "failed_units": [],
+        "latest_available_observation": "2026-10-21",
+        "history_json_path": "/path/.../global_history.json",
+        "history_csv_path": "/path/.../global_history.csv",
+        "tile_records_path": "/path/.../tile_records.json",
+        "tiles_geojson_path": "/path/.../river_tiles.geojson",
+        "state_path": "/path/.../state.json",
+        "discovery_windows": [
+          {
+            "start_date": "2026-11-05",
+            "end_date": "2026-11-09"
+          }
+        ],
+        "warnings": []
+      },
+      "error": null
+    }
+  }
+}
+```
+
+This example is abbreviated. The actual response preserves the complete submission and collection result structures.
+
+---
+
+#### 7. Understanding the Successful Response
+
+The response contains two important objects.
+
+##### satellite_submission
+
+Represents the initial response returned by the external Collector when the job was accepted.
+
+It includes:
+
+- job_id
+- run_job_id
+- aoi_id
+- sensor
+- target_date
+- submitted_at
+- initial status
+
+The initial status is commonly `queued`.
+
+This object records the submission state and is not subsequently overwritten by the final result.
+
+##### satellite_collection
+
+Represents the latest or final job state retrieved during polling.
+
+It includes:
+
+- job_id
+- run_job_id
+- current status
+- timestamps
+- result
+- error
+
+For a successful job, `result` contains collection details.
+
+Important result fields:
+
+| Field | Description |
+|---|---|
+| `run_summary` | Human-readable summary of the collection |
+| `mode` | Collection mode used |
+| `available_dates` | Dates identified during discovery |
+| `missing_dates` | Dates requiring collection |
+| `collected_dates` | Dates collected during the run |
+| `new_record_count` | Number of newly collected tile-date records |
+| `failed_units` | Units that failed during processing |
+| `latest_available_observation` | Latest available observation reported by the Collector |
+| `discovery_windows` | Date windows searched |
+| `warnings` | Nonfatal warnings |
+
+The result may also contain paths to output files maintained inside the Collector service.
+
+These paths refer to the Collector's filesystem, not the Data Ingestion Module's filesystem.
+
+They should not be interpreted as public download URLs.
+
+---
+
+#### 8. Retrieve an Existing Satellite Job
+
+The Data Ingestion Module provides a read-only endpoint for retrieving an existing job.
+
+GET /api/ingestion/satellite/jobs/{job_id}
+
+Example:
+
+GET /api/ingestion/satellite/jobs/3c16420e507f448ea01a13f71267db3e
+
+The module forwards this request to:
+
+GET /api/collection/jobs/{job_id} on the external Satellite Collector service.
+
+It authenticates using the configured API key and returns the validated upstream job response.
+
+The status endpoint does not:
+
+- Create a new job.
+- Restart an existing job.
+- Cancel an existing job.
+- Modify collected satellite data.
+
+For a completed job, the returned status is:
+
+`succeeded`
+
+The complete Collector result remains available in the response as long as the upstream service retains the job.
+
+---
+
+#### 9. Pending Collection Jobs
+
+Satellite collection can require several minutes.
+
+If the Data Ingestion Module reaches its polling deadline, it returns: `pending`
+
+This does not mean the Collector failed. The remote job continues independently. A pending response retains the upstream job identifier and the latest known job state.
+
+Clients should save: `collector_result.satellite_submission.job_id`
+
+They can subsequently retrieve the job using: `GET /api/ingestion/satellite/jobs/{job_id}`
+
+Do not submit the same collection request again merely because the ingestion response is pending.
+
+---
+
+#### 10. Error Handling
+
+The satellite integration distinguishes job execution failures from HTTP-level communication and configuration errors.
+
+##### Failed collection
+
+If the Collector returns: `failed` the Data Ingestion Module maps the terminal result to: `status: failed`
+
+The upstream error information is preserved.
+
+##### Partial collection
+
+If the Collector returns: `partial` the Data Ingestion Module returns: `status: partial`
+
+The available upstream result and error information remain accessible.
+
+##### Collector unavailable
+
+Communication failures, invalid authentication, and malformed upstream responses are handled by the adapter's error mapping.
+
+Transient polling failures receive bounded retries. Submission is not automatically retried.
+
+##### Invalid requests
+
+Unsupported or invalid satellite options produce HTTP 422.
+
+Examples include:
+
+- Invalid sensor.
+- Unsupported mode.
+- Invalid AOI ID.
+- Invalid bounding box.
+- Invalid collection dates.
+- Nonpositive run limits.
+- Cloud coverage outside 0–100.
+
+---
+
+
+## UC1 Sperchios — Hydro Modeling Integration
+
+The Data Ingestion Module provides two independent Hydro Modeling profiles for the Sperchios river and Maliakos Gulf:
+
+- `uc1-sperchios-river`
+- `uc1-sperchios-sea`
+
+Both profiles are available through:
+
+POST /api/ingestion/run
+
+The ingestion module communicates with the Hydro Modeling microservice, executes the required upstream operations, validates their responses, and returns the results in a common ingestion response envelope.
+
+The two workflows operate independently. Running one does not automatically execute the other.
+
+### Configuration
+
+The following environment variables configure the integration:
+
+| Variable | Description |
+|---|---|
+| `UC1_HYDRO_BASE_URL` | Hydro Modeling service base URL |
+| `UC1_HYDRO_API_KEY` | Hydro Modeling API key |
+| `UC1_SPERCHIOS_ANALYSIS_AREA_ID` | Static river analysis area ID |
+| `UC1_SPERCHIOS_MARINE_ANALYSIS_AREA_ID` | Static marine analysis area ID |
+
+Configured analysis IDs:
+
+River: df1e179a-99d6-4eef-8a28-08a01fed8a99
+
+Marine: 04d4d57b-ae59-4c32-8004-c0e201f48be5
+
+### 1. Sperchios River Ingestion
+
+Profile:
+
+`uc1-sperchios-river`
+
+#### Workflow
+
+The river workflow executes three sequential operations:
+
+1. Retrieve the configured static river analysis.
+2. Execute ECMWF ERA5-Land reanalysis ingestion.
+3. Execute the 15-day local forecast.
+
+The local forecast depends on the preceding operations completing successfully.
+
+#### Request
+
+POST /api/ingestion/run
+
+```json
+{
+  "run_job_id": "uc1-sperchios-river-example-001",
+  "triggered_at": "2026-11-09T09:00:00Z",
+  "provider": "sentinel-2",
+  "profile": "uc1-sperchios-river",
+  "aoi_id": "sperchios",
+  "bbox": [
+    22.433493,
+    38.837552,
+    22.569555,
+    38.894223
+  ]
+}
+```
+
+#### Successful response
+
+HTTP 200 OK
+
+The following example summarizes the actual successful integration response observed on November 9, 2026.
+
+```json
+{
+  "run_job_id": "uc1-sperchios-river-test-001",
+  "provider": "sentinel-2",
+  "profile": "uc1-sperchios-river",
+  "aoi_id": "sperchios",
+  "triggered_at": "2026-11-04T09:00:00Z",
+  "started_at": "2026-11-09T09:02:08.592079Z",
+  "completed_at": "2026-11-09T09:02:11.593973Z",
+  "duration_ms": 3002,
+  "status": "success",
+  "collector_result": {
+    "status": "success",
+    "static_river_analysis": {
+      "analysis_area_id": "df1e179a-99d6-4eef-8a28-08a01fed8a99",
+      "river_id": "d0e1672e-b7da-47fc-9e2c-4223ead0e4f4",
+      "river_name": "Σπερχειός",
+      "status": "READY",
+      "static_version": "v1",
+      "hydraulic_model_version": "hydraulics_v1"
+    },
+    "ecmwf_reanalysis": {
+      "status": "reanalysis_ready",
+      "analysis_area_id": "df1e179a-99d6-4eef-8a28-08a01fed8a99",
+      "dataset": "era5land",
+      "action_date": "2026-11-09",
+      "selected_records": 55,
+      "reanalysis_dates": [],
+      "inserted": 0,
+      "existing": 0,
+      "updated": 0,
+      "skipped": 0
+    },
+    "ecmwf_local_forecast": {
+      "status": "forecast_ready",
+      "analysis_area_id": "df1e179a-99d6-4eef-8a28-08a01fed8a99",
+      "dataset": "local_model_forecast",
+      "forecast_base_date": "2026-11-03",
+      "forecast_start_date": "2026-11-04",
+      "forecast_end_date": "2026-11-18",
+      "horizon_days": 15,
+      "records_prepared": 825,
+      "inserted": 275,
+      "existing": 550,
+      "updated": 550,
+      "skipped": 0
+    }
+  }
+}
+```
+
+This example is abbreviated for readability. The actual API preserves the complete upstream response bodies, including analysis geometry, forecast dates, metadata, and processing information.
+
+#### Response interpretation
+
+| Field | Description |
+|---|---|
+| `static_river_analysis` | Static hydraulic analysis metadata |
+| `ecmwf_reanalysis` | ERA5-Land ingestion result |
+| `ecmwf_local_forecast` | Local forecast ingestion result |
+| `horizon_days` | Forecast horizon, fixed at 15 days |
+| `records_prepared` | Forecast records prepared for persistence |
+| `inserted` | Newly inserted records |
+| `existing` | Records already present |
+| `updated` | Existing records updated |
+
+The number of inserted records depends on the state of Hydro Modeling's database and may vary between executions.
+
+A successful ingestion does not necessarily imply that new records were inserted.
+
+---
+
+### 2. Sperchios Sea Ingestion
+
+Profile:
+
+`uc1-sperchios-sea`
+
+#### Workflow
+
+The sea workflow performs two sequential operations:
+
+1. Retrieve and validate the configured marine analysis for the Sperchios river.
+2. Execute ECMWF IFS forecast ingestion for the selected marine area.
+
+The static marine analysis must exist uniquely and be associated with the configured Sperchios river analysis.
+
+The forecast horizon is fixed at six days.
+
+#### Request
+
+POST /api/ingestion/run
+
+```json
+{
+  "run_job_id": "uc1-sperchios-sea-example-001",
+  "triggered_at": "2026-11-09T09:00:00Z",
+  "provider": "sentinel-2",
+  "profile": "uc1-sperchios-sea",
+  "aoi_id": "sperchios",
+  "bbox": [
+    22.433493,
+    38.837552,
+    22.569555,
+    38.894223
+  ]
+}
+```
+
+#### Successful response
+
+HTTP 200 OK
+
+The following example summarizes the successful production response observed on November 9, 2026.
+
+```json
+{
+  "run_job_id": "uc1-sperchios-sea-test-001",
+  "provider": "sentinel-2",
+  "profile": "uc1-sperchios-sea",
+  "aoi_id": "sperchios",
+  "triggered_at": "2026-11-04T09:00:00Z",
+  "started_at": "2026-11-09T08:52:37.516021Z",
+  "completed_at": "2026-11-09T08:53:06.174777Z",
+  "duration_ms": 28659,
+  "status": "success",
+  "collector_result": {
+    "status": "success",
+    "static_marine_analysis": {
+      "count": 1,
+      "analyses": [
+        {
+          "marine_analysis_area_id": "04d4d57b-ae59-4c32-8004-c0e201f48be5",
+          "name": "Maliakos Gulf",
+          "status": "READY",
+          "river_analysis_area_id": "df1e179a-99d6-4eef-8a28-08a01fed8a99",
+          "mesh_status": "READY",
+          "mesh_resolution_m": 500.0,
+          "mesh_triangle_count": 6232,
+          "bathymetry_dataset": "EMODnet DTM"
+        }
+      ]
+    },
+    "ifs_ingestion": {
+      "status": "COMPLETED",
+      "marine_analysis_area_id": "04d4d57b-ae59-4c32-8004-c0e201f48be5",
+      "dataset": "ifs_forecast",
+      "processing_version": "v1",
+      "forecast_run_time": "2026-11-09T00:00:00Z",
+      "requested_date": "2026-11-09",
+      "horizon_days": 6,
+      "forecast_dates": [
+        "2026-11-09",
+        "2026-11-10",
+        "2026-11-11",
+        "2026-11-12",
+        "2026-11-13",
+        "2026-11-14",
+        "2026-11-15"
+      ],
+      "records_prepared": 294,
+      "inserted": 294,
+      "existing": 0,
+      "updated": 0,
+      "source_files": [
+        "ifs_10u.grib2",
+        "ifs_10v.grib2"
+      ]
+    }
+  }
+}
+```
+
+This example is abbreviated. The real response includes the complete static marine analysis metadata and IFS ingestion results.
+
+#### Response interpretation
+
+| Field | Description |
+|---|---|
+| `static_marine_analysis.count` | Number of returned marine analyses |
+| `static_marine_analysis.analyses` | Available marine analysis metadata |
+| `ifs_ingestion` | IFS forecast ingestion result |
+| `forecast_run_time` | ECMWF forecast initialization time |
+| `requested_date` | Date requested for ingestion |
+| `horizon_days` | Configured six-day forecast horizon |
+| `forecast_dates` | Dates represented in the returned forecast |
+| `source_files` | Source GRIB files reported by Hydro Modeling |
+| `records_prepared` | Records prepared for persistence |
+| `inserted` | Newly inserted records |
+
+Although `horizon_days` is six, the returned forecast_dates list may contain seven dates because it includes the initialization date and subsequent forecast dates.
+
+---
+
+### 3. Status and Error Handling
+
+The Data Ingestion Module preserves successful upstream results and identifies the failing workflow step.
+
+Both Sperchios profiles have been successfully tested against the live Hydro Modeling service.
+
+However, an upstream request may fail due to network availability, timeouts, configuration problems, or invalid upstream responses.
+
+#### Successful execution
+
+HTTP 200
+
+```json
+{
+  "status": "success",
+  "collector_result": {
+    "status": "success"
+  }
+}
+```
+
+The actual response also includes the common ingestion metadata and the individual upstream response bodies.
+
+#### Partial execution
+
+If an earlier operation succeeds but a later step fails, the ingestion module may return:
+
+HTTP 200
+
+```json
+{
+  "status": "partial",
+  "collector_result": {
+    "status": "partial",
+    "static_river_analysis": {
+      "analysis_area_id": "df1e179a-99d6-4eef-8a28-08a01fed8a99",
+      "status": "READY"
+    },
+    "error": {
+      "step": "ecmwf_reanalysis",
+      "category": "CollectorUnavailableError",
+      "message": "Hydro Modeling request timed out."
+    }
+  }
+}
+```
+
+This is an abbreviated example based on an observed timeout during live testing. The same river workflow subsequently completed successfully.
+
+The error object contains:
+
+| Field | Description |
+|---|---|
+| `step` | Workflow operation that failed |
+| `category` | Error classification |
+| `message` | Description of the failure |
+
+Previously completed upstream responses remain available.
+
+Subsequent dependent steps are not executed after a failure.
+
+#### Other HTTP errors
+
+| HTTP | Description |
+|---|---|
+| 400 | Invalid or missing configuration |
+| 422 | Invalid ingestion request |
+| 503 | Upstream dependency unavailable |
+| 500 | Unexpected execution failure |
+
+HTTP 200 does not automatically indicate successful ingestion. Always inspect the top-level `status` and `collector_result`.
+
+---
 
 ### UC3: `coastal-uc3-sentinel2`
 
@@ -238,15 +925,3 @@ Messages are sanitized for adapter execution failures. Validation messages may c
 - The UC3 package must be installed in the runtime image and its server-side `UC3_INGEST_*` settings must be configured.
 
 See [UC3 Integration Documentation](uc3-integration.md) for package installation, environment setup, and manual execution guidance.
-
-## UC1 Sperchios profiles
-
-`POST /api/ingestion/run` accepts `uc1-water-pollutants-collector`, `uc1-sperchios-river` and `uc1-sperchios-sea` with the common fields, for example:
-
-```json
-{"run_job_id":"uc1-sea-001","triggered_at":"2026-11-03T07:00:00Z","provider":"sentinel-2","profile":"uc1-sperchios-sea","aoi_id":"sperchios","bbox":[22.433493,38.837552,22.569555,38.894223]}
-```
-
-The existing response envelope contains `collector_result.status` and full upstream responses: `satellite_collection` for the satellite profile; `static_river_analysis`, `ecmwf_reanalysis`, `ecmwf_local_forecast` for river; and `static_marine_analysis`, `ifs_ingestion` for sea. A `queued` satellite job means submission succeeded, not collection completion. A Hydro Modeling failure after an earlier response returns HTTP 200 with `status: partial`, the completed responses, and an `error` containing `step`, `category`, and `message`. Earlier errors use the existing 400/503/500 error mapping. No automatic POST retries occur; satellite status is polled until terminal or pending.
-
-The satellite profile accepts `sensor` (`sentinel2` or `sentinel3`), `mode`, `history_start`, `target_date`, `max_days_per_run`, `max_tiles_per_run`, `discovery_chunk_days`, and `max_cloud_coverage`. Its downstream job ID uses `uc1.collection.water-pollutants_<trigger UTC date>_<hash>`, where the hash derives from the overall run ID. Reuse of the same run ID and trigger date produces the same ID, but upstream idempotency is not guaranteed.
