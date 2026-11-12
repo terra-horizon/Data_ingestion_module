@@ -7,7 +7,7 @@
 GET {{productionUrl}}/api/ingestion/satellite/jobs/{{jobId}}
 Accept: application/json
 
-### WRITES DATA: submits a real satellite job; productionUrl targets production from SSH
+### WRITES DATA: submits a real satellite job on the uth server
 POST {{productionUrl}}/api/ingestion/run
 Content-Type: application/json
 Accept: application/json
