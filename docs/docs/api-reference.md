@@ -15,9 +15,9 @@ The module exposes a synchronous REST API for registered ingestion workflows. Bo
 
 Local development: `http://127.0.0.1:8000`
 
-Production: `https://server.iprism.eu/data-ingestion`
+Production: `https://server.iprism.eu/terra/data-ingestion`
 
-Append endpoint paths to the base URL. In production the reverse proxy serves the application under `/data-ingestion`. Interactive OpenAPI documentation is at `/docs` (under the production prefix, `/data-ingestion/docs`).
+Append endpoint paths to the base URL. Interactive documentation is at `/docs` locally and `/terra/data-ingestion/docs` publicly. The schema is at `/terra/data-ingestion/openapi.json` publicly; internal endpoint paths remain unchanged.
 
 ---
 

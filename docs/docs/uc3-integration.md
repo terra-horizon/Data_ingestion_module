@@ -142,8 +142,6 @@ curl -i http://127.0.0.1:18000/health/ready
 curl -i http://127.0.0.1:18000/health/ready/coastal-uc3-sentinel2
 ```
 
-The current Compose file binds port 18000 only to server loopback. Retain the existing reverse-proxy mapping for `/data-ingestion/`; the public UC3 readiness URL is `https://server.iprism.eu/data-ingestion/health/ready/coastal-uc3-sentinel2` and the POST URL remains `https://server.iprism.eu/data-ingestion/api/ingestion/run`. Ensure the proxy's access controls cover ingestion and its timeouts accommodate synchronous acquisition; the application adds no UC3 API-key mechanism. Keep the previous image for rollback. No additional UC3 service, job-store provisioning, or storage migration is required by this package integration.
-
 ## Private package and distribution disclaimer
 
 The `terra-wp2-uc3-ingestion` package is developed and maintained by the UC3 team in a private repository. Its source code and wheel are not included in this repository and must be obtained through an authorised handover or approved private artifact distribution channel. A Git checkout alone is insufficient to build or deploy the integration without the required wheel.

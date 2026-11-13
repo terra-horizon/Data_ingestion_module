@@ -18,7 +18,7 @@ python -m pip install vendor/terra_wp2_uc3_ingestion-0.5.2-py3-none-any.whl -e "
 uvicorn app.main:app --reload
 ```
 
-The API listens on `127.0.0.1:8000` by default. Swagger UI is at `/docs`.
+The API listens on `127.0.0.1:8000` by default. Leave `APP_ROOT_PATH=` empty locally; Swagger UI is at `http://127.0.0.1:8000/docs`. A direct Uvicorn process needs an explicit `--root-path` option for a prefix; its `--env-file` does not configure Uvicorn itself.
 
 ## Docker image
 

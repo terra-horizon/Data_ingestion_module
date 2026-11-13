@@ -51,7 +51,7 @@ Copy `.env.example` to `.env`, supply the required remote service settings and U
 uvicorn app.main:app --reload --env-file .env
 ```
 
-Swagger UI is available at <http://127.0.0.1:8000/docs>.
+Leave `APP_ROOT_PATH=` empty for local development. Swagger UI is available at <http://127.0.0.1:8000/docs>. For a direct Uvicorn process, pass `--root-path /terra/data-ingestion` explicitly if testing behind a prefix-stripping proxy; `--env-file` alone does not configure Uvicorn options.
 
 ## Run ingestion
 
@@ -82,6 +82,15 @@ Save `collector_result.satellite_submission.job_id` and retrieve the latest upst
 ## Docker
 
 Compose injects `.env` into the API container on the external `terra-network`. For the internal services set `UC1_COLLECTOR_BASE_URL=http://uc1-water-pollutants-collector:8000` and `UC1_HYDRO_BASE_URL=http://hydro-modeling-service:8000`. UC3 storage remains separately configured. Start with `docker compose up --build -d`; the main Compose file exposes port 18000 locally.
+
+For production, set `APP_ROOT_PATH=/terra/data-ingestion` in the project `.env` or the shell used to run Compose. Compose interpolation reads the project `.env` or shell environment separately from the container `env_file`; shell values take precedence. Once that change is in place, the public URLs are:
+
+- Swagger UI: https://server.iprism.eu/terra/data-ingestion/docs
+- OpenAPI: https://server.iprism.eu/terra/data-ingestion/openapi.json
+- Readiness: https://server.iprism.eu/terra/data-ingestion/health/ready
+- Ingestion: https://server.iprism.eu/terra/data-ingestion/api/ingestion/run
+
+The internal routes remain unprefixed. See [deployment](docs/docs/deployment.md) for the service-only update commands.
 
 ## Tests
 
