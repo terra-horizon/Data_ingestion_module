@@ -1,5 +1,5 @@
 @baseUrl = http://127.0.0.1:18000
-@productionUrl = https://server.iprism.eu/data-ingestion
+@productionUrl = https://server.iprism.eu/terra/data-ingestion
 
 ### UC3 readiness (read-only)
 GET {{baseUrl}}/health/ready/coastal-uc3-sentinel2

@@ -1,5 +1,5 @@
 @baseUrl = http://127.0.0.1:18000
-@productionUrl = https://server.iprism.eu/data-ingestion
+@productionUrl = https://server.iprism.eu/terra/data-ingestion
 
 ### Liveness: confirms that the FastAPI process is running
 GET {{baseUrl}}/health/live
